@@ -24,11 +24,11 @@ export interface Harness {
 }
 
 export function harness(opts: { interactive?: boolean; fetch?: typeof fetch } = {}): Harness {
-  const dir = mkdtempSync(join(tmpdir(), "ccpick-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "ccpluck-test-"));
   const home = join(dir, "home");
   mkdirSync(home, { recursive: true });
   const settingsPath = join(home, ".claude", "settings.json");
-  const dataDir = join(home, ".ccpick");
+  const dataDir = join(home, ".ccpluck");
   let clock = Date.parse("2026-11-18T00:00:00Z");
   const h: Harness = {
     dir,
@@ -84,5 +84,5 @@ export function leftoverTmp(dir: string): string[] {
 }
 
 export function bundle(items: { id: string; value: unknown }[], extra: Record<string, unknown> = {}) {
-  return { format: "ccpick-bundle", version: 1, items, ...extra };
+  return { format: "ccpluck-bundle", version: 1, items, ...extra };
 }

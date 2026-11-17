@@ -6,7 +6,7 @@
     "rootDir": "..",
     "baseUrl": ".",
     "paths": {
-      "@ccpick/core": ["../core/src/index.ts"]
+      "@ccpluck/core": ["../core/src/index.ts"]
     }
   },
   "include": ["src", "test"]

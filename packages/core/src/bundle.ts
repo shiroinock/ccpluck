@@ -2,8 +2,8 @@ import { clone, isPlainObject, type JsonObject, type JsonValue, type Settings, t
 import { decompose, itemFromId, type Item } from "./items.js";
 import { maskSettings, type MaskFinding, type MaskOptions } from "./mask.js";
 
-export const BUNDLE_FORMAT = "ccpick-bundle";
-export const POST_FORMAT = "ccpick-post";
+export const BUNDLE_FORMAT = "ccpluck-bundle";
+export const POST_FORMAT = "ccpluck-post";
 
 /** 項目ごとの「なぜこう設定したか」 */
 export interface NoteEntry {

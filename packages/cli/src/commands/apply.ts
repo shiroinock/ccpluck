@@ -14,7 +14,7 @@ import {
   type MergeResult,
   type Notes,
   type SkipReason,
-} from "@ccpick/core";
+} from "@ccpluck/core";
 import { CliError, type Context } from "../context.js";
 import { exists, readSettingsFile, sha256, writeSettings, type SettingsFile } from "../fsutil.js";
 import { indent, itemLine, makeStyle, pretty, riskBadge, short } from "../render.js";
@@ -283,7 +283,7 @@ export async function applyItems(ctx: Context, opts: ApplyItemsOptions): Promise
     throw e;
   }
   io.err(s.green(`\n適用しました。importId: ${id}`));
-  io.err(s.dim(`戻すには: ccpick undo ${id}`));
+  io.err(s.dim(`戻すには: ccpluck undo ${id}`));
   return { code: 0, importId: id };
 }
 

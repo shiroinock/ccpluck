@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { publishCandidates } from "@ccpick/core";
+import { publishCandidates } from "@ccpluck/core";
 import { harness, type Harness } from "./harness.js";
 
 /** 秘密らしい値はすべて架空（FAKE を含む） */
@@ -38,7 +38,7 @@ function setup(settings: object = MINE): Harness {
   return h;
 }
 
-const postPath = (h: Harness) => join(h.dir, "ccpick-post.json");
+const postPath = (h: Harness) => join(h.dir, "ccpluck-post.json");
 const readPost = (h: Harness) => JSON.parse(readFileSync(postPath(h), "utf8"));
 
 describe("publish", () => {
@@ -67,7 +67,7 @@ describe("publish", () => {
     expect(err).toContain("確認してほしい箇所: wiki.example.internal");
     expect(err).toContain("公開する 4 件（理由つき 3 件）、公開しない 2 件");
     const post = readPost(h);
-    expect(post.format).toBe("ccpick-post");
+    expect(post.format).toBe("ccpluck-post");
     expect(post.settings).toEqual({
       model: "opus",
       permissions: { deny: ["Bash(rm -rf *)"] },
@@ -79,7 +79,7 @@ describe("publish", () => {
     expect(post.meta).toEqual({ os: "macos", tags: ["web", "safety"], title: "Web の設定", license: "CC0-1.0" });
     expect(readFileSync(postPath(h), "utf8")).not.toContain("ghp_");
     expect(readdirSync(join(h.dataDir, "publish"))).toHaveLength(1);
-    expect(err).toContain("ccpick pick");
+    expect(err).toContain("ccpluck pick");
   });
 
   it("--update carries choices and reasons over and asks only about what changed", async () => {

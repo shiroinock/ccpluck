@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBundle } from "@ccpick/core";
+import { parseBundle } from "@ccpluck/core";
 import {
   buildBundle,
   buildModel,
@@ -215,10 +215,10 @@ describe("timeline", async () => {
 
 describe("pick (他人の設定からもらう)", async () => {
   const { parseSource, compareWithMine, timelineState, attentionOrder, pickAttentionOf } = await import("../src/model.js");
-  const { decompose } = await import("@ccpick/core");
+  const { decompose } = await import("@ccpluck/core");
 
   const POST = JSON.stringify({
-    format: "ccpick-post",
+    format: "ccpluck-post",
     version: 1,
     settings: {
       model: "opus",

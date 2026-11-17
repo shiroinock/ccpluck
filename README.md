@@ -1,4 +1,4 @@
-# ccpick（仮称）
+# ccpluck（仮称）
 
 Claude Code の `settings.json` を **項目単位で** 共有・取り込み・巻き戻しするためのツール群です。
 設計の背景は [HANDOFF.md](HANDOFF.md) を参照してください。
@@ -39,7 +39,7 @@ Node 22 と pnpm 10 で確認しています。
 
 マイルストーン 4 以降は HANDOFF から組み直した。画面は CLI だけにし、投稿の置き場所はまず社内の GitHub リポジトリ、社外公開のときにサーバーを足す。経緯とユースケースは [docs/use-cases.md](docs/use-cases.md) にある。
 
-## `@ccpick/core`
+## `@ccpluck/core`
 
 ブラウザと Node の両方で動きます。`node:*` などの I/O には依存しません（ビルド設定で `types: []` にして混入を防いでいます）。ES2022（`Object.hasOwn`、正規表現の後読み）が必要です。
 
@@ -76,38 +76,38 @@ Node 22 と pnpm 10 で確認しています。
 - `{"..."}` は配列の要素、`{name:"..."}` は hook の matcher や command（中身は JSON 文字列リテラル）
 - matcher のない hook グループは `{}`（例: `/hooks/Stop/{}/{command:"say done"}`）
 
-## `ccpick`（CLI）
+## `ccpluck`（CLI）
 
 ```bash
 pnpm build
-node packages/cli/dist/bin.js --help      # 公開後は npx ccpick
+node packages/cli/dist/bin.js --help      # 公開後は npx ccpluck
 ```
 
 | コマンド | 内容 |
 |---|---|
-| `ccpick pick <投稿>` | 投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む。`<投稿>` は投稿・バンドル・settings.json のファイルか https URL。`--all`、非対話では `--only <itemId>` か `--yes-low` |
-| `ccpick publish` | 自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る（既定 `./ccpick-post.json`）。`--update <投稿>` で前回の選択と理由を引き継ぐ |
-| `ccpick apply <bundle>` | 差分とリスクを表示 → 確認 → 適用。`<bundle>` はファイル、https URL、`-`（標準入力）。import バンドルと投稿（`export` の出力）のどちらも受け付ける |
-| `ccpick history [importId]` | 取り込み履歴の一覧／詳細（`--json`） |
-| `ccpick undo <importId>` | 取り込み単位で戻す |
-| `ccpick revert <itemId>` | 項目単位で戻す（`--import <importId>` で対象の取り込みを指定） |
-| `ccpick export --mask` | 手元の設定をマスクして投稿用 JSON を作る（`--public-env`、`--notes`、`--tag`、`-o`） |
+| `ccpluck pick <投稿>` | 投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む。`<投稿>` は投稿・バンドル・settings.json のファイルか https URL。`--all`、非対話では `--only <itemId>` か `--yes-low` |
+| `ccpluck publish` | 自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る（既定 `./ccpluck-post.json`）。`--update <投稿>` で前回の選択と理由を引き継ぐ |
+| `ccpluck apply <bundle>` | 差分とリスクを表示 → 確認 → 適用。`<bundle>` はファイル、https URL、`-`（標準入力）。import バンドルと投稿（`export` の出力）のどちらも受け付ける |
+| `ccpluck history [importId]` | 取り込み履歴の一覧／詳細（`--json`） |
+| `ccpluck undo <importId>` | 取り込み単位で戻す |
+| `ccpluck revert <itemId>` | 項目単位で戻す（`--import <importId>` で対象の取り込みを指定） |
+| `ccpluck export --mask` | 手元の設定をマスクして投稿用 JSON を作る（`--public-env`、`--notes`、`--tag`、`-o`） |
 
-共通オプション: `--settings-path`（既定 `$CLAUDE_CONFIG_DIR/settings.json`、なければ `~/.claude/settings.json`）、`--data-dir`（既定 `$CCPICK_HOME`、なければ `~/.ccpick`）。
+共通オプション: `--settings-path`（既定 `$CLAUDE_CONFIG_DIR/settings.json`、なければ `~/.claude/settings.json`）、`--data-dir`（既定 `$CCPLUCK_HOME`、なければ `~/.ccpluck`）。
 
 **pick の流れ**
 1. 投稿と自分の settings.json を読み、項目ごとに「持っていない／値が違う／同じ」を判定する。同じものは出さない
 2. 作者が理由を書いた項目と自分にない項目から 1 件ずつ出す。値が違う（置き換えになる）項目は後ろ。各カードに作者の理由、リスク、自分の今の値を出す
 3. 1 キーで決める：`y` もらう、`n` もらわない、`l` あとで（列の最後へ）、`z` ひとつ戻す、`?` 詳しく（項目 ID・スキーマの説明・リスクの理由・値の全文）、`q` ここで終える
 4. 「もらう 4 件（high 1、置き換え 1）、もらわない 9 件」とまとめ、あとは apply と同じ流れで取り込む（マスク値の入力、high の `yes` 確認、計画の表示、最後の確認は Enter で適用）。カードで「置き換わります」を見てもらうと決めた項目は、衝突として聞き直さない
-5. 決めた結果を `~/.ccpick/picks/` に覚える。同じ投稿（同じファイルパスか URL）を次に pick すると、前回決めた項目のうち値が変わっていないものは出さない（`--all` で全部）。最後の確認で断ったときと `--dry-run` のときは覚えない
+5. 決めた結果を `~/.ccpluck/picks/` に覚える。同じ投稿（同じファイルパスか URL）を次に pick すると、前回決めた項目のうち値が変わっていないものは出さない（`--all` で全部）。最後の確認で断ったときと `--dry-run` のときは覚えない
 
 **publish の流れ**
 1. settings.json を読んでマスクする（`export --mask` と同じ規則）。マスクした値・置き換えたパス・確認してほしい箇所の件数を出す
 2. マスクした値 → high → 確認してほしい箇所（社内ホスト名など）→ medium → low の順に 1 件ずつ出す。カードには公開される値（マスク後）を出す
 3. 1 キーで決める：`y` 公開する（続けて理由を 1 行で聞く。Enter で省略）、`n` 公開しない、`l` あとで、`w` 理由を書く、`e` 理由を `$VISUAL` / `$EDITOR` で書く、`v` env の値を公開する／隠す、`z` ひとつ戻す、`?` 詳しく、`q` ここで終える（残りは公開しない）
 4. タイトルと用途タグを聞き（`--title` / `--tag` があれば聞かない。OS は実行環境から）、公開される JSON の全文と、残っている確認してほしい箇所を見せてから書き出す
-5. 決めた結果を `~/.ccpick/publish/` に覚える。`publish --update <投稿>` は、前回決めた項目のうち値が変わっていないものを聞かずに引き継ぎ（前回の投稿に入っていたものは「公開する」、理由もそのまま）、増えた・値が変わった項目だけを聞く。タイトルとタグは Enter で前回のまま
+5. 決めた結果を `~/.ccpluck/publish/` に覚える。`publish --update <投稿>` は、前回決めた項目のうち値が変わっていないものを聞かずに引き継ぎ（前回の投稿に入っていたものは「公開する」、理由もそのまま）、増えた・値が変わった項目だけを聞く。タイトルとタグは Enter で前回のまま
 
 **apply の流れ**
 1. バンドルを検証する。ID と値が食い違う項目が 1 つでもあれば全体を中止する
@@ -117,20 +117,20 @@ node packages/cli/dist/bin.js --help      # 公開後は npx ccpick
 5. 計画（追加／置換／スキップ）、allow と deny の矛盾、依存ファイル不足を表示し、全体の確認（`y` または `--yes`）を求める。`--dry-run` はここで止まる
 6. 履歴を記録してから、一時ファイルに書いて rename する。書き込む前に、書き込む文字列そのものを検証する
 
-**履歴** は `~/.ccpick/imports/<importId>.json` に 1 回の取り込みごとに保存する。適用前のファイル全体（`beforeText`）、適用直後の sha256、項目ごとのジャーナル（`{itemId, op, before, after}`）、revert 済みの項目を持つ。
+**履歴** は `~/.ccpluck/imports/<importId>.json` に 1 回の取り込みごとに保存する。適用前のファイル全体（`beforeText`）、適用直後の sha256、項目ごとのジャーナル（`{itemId, op, before, after}`）、revert 済みの項目を持つ。
 
 **undo** は、ファイルが適用直後のまま（sha256 一致）なら適用前の中身をそのまま書き戻す（バイト一致。適用前にファイルがなければ削除する）。その後にファイルが変わっていれば、ジャーナルから項目ごとに戻し、適用後に手で変更された項目があれば止める（`--force` で変更されていない項目だけ戻す）。
 
 **revert** は、その項目を最後に適用した取り込みの操作だけを取り消す。適用後に手で変更されていれば止める。
 
-**テストと実ホーム**: CLI のテストは `test/setup.ts` で `HOME` / `CLAUDE_CONFIG_DIR` / `CCPICK_HOME` を一時ディレクトリに向け、すべてのコマンドに一時ディレクトリの `--settings-path` / `--data-dir` を渡す。さらにテストの前後で本物の `~/.claude/settings.json` と `~/.ccpick` の更新時刻とサイズが変わっていないことを検査している。
+**テストと実ホーム**: CLI のテストは `test/setup.ts` で `HOME` / `CLAUDE_CONFIG_DIR` / `CCPLUCK_HOME` を一時ディレクトリに向け、すべてのコマンドに一時ディレクトリの `--settings-path` / `--data-dir` を渡す。さらにテストの前後で本物の `~/.claude/settings.json` と `~/.ccpluck` の更新時刻とサイズが変わっていないことを検査している。
 
 ## Web（ローカル版）
 
 ```bash
-pnpm --filter @ccpick/web dev       # 開発サーバー（http://localhost:5173）
-pnpm --filter @ccpick/web build     # apps/web/dist に静的ファイルを出力
-pnpm --filter @ccpick/web preview   # ビルド結果を http://localhost:4173 で確認
+pnpm --filter @ccpluck/web dev       # 開発サーバー（http://localhost:5173）
+pnpm --filter @ccpluck/web build     # apps/web/dist に静的ファイルを出力
+pnpm --filter @ccpluck/web preview   # ビルド結果を http://localhost:4173 で確認
 ```
 
 `apps/web/dist` はどこに置いても動く静的ファイルです（相対パスでビルド）。ES モジュールを使うため `file://` で直接開くことはできず、何らかの HTTP サーバーから配信する必要があります。
@@ -138,10 +138,10 @@ pnpm --filter @ccpick/web preview   # ビルド結果を http://localhost:4173 �
 画面は「もらう」と「公開する」の 2 つの目的に分かれ、それぞれ「順に見る」（タイムライン）と「一覧から選ぶ」の 2 つの見せ方がある。どちらの見せ方でも選んだ状態は共有される。
 
 **もらう**（誰かの設定から、欲しいキーだけ自分の settings.json へ）
-1. 誰かの投稿（`ccpick-post`）か素の settings.json を貼り付ける。投稿ならタイトル・OS・タグを見出しに出す
+1. 誰かの投稿（`ccpluck-post`）か素の settings.json を貼り付ける。投稿ならタイトル・OS・タグを見出しに出す
 2. 任意で自分の settings.json を貼ると、すでに持っている項目は飛ばし（最後にまとめて表示）、値が違う項目には自分の今の値を並べる。比較専用で書き出しには入らない
 3. 「順に見る」では、作者が理由を書いた項目・自分に足りない項目から 1 件ずつ出す。作者の理由をいちばん大きく見せ、「もらう（Y）／もらわない（N）／あとで（L）」で決める。Z でひとつ戻す。決めた項目は上の線に積まれ、押すと決め直せる
-4. 「取り込み用に書き出す」で import バンドルを保存し、`npx ccpick apply` に渡す。作者の理由はバンドルの注釈として一緒に持っていく
+4. 「取り込み用に書き出す」で import バンドルを保存し、`npx ccpluck apply` に渡す。作者の理由はバンドルの注釈として一緒に持っていく
 
 **公開する**（自分の設定をマスクし、理由を添えて共有する）
 1. 自分の settings.json を貼り付ける。マスクは常にオン（外せない）。env は公開してよいキーだけ個別に選ぶ
@@ -149,7 +149,7 @@ pnpm --filter @ccpick/web preview   # ビルド結果を http://localhost:4173 �
 3. 「投稿用に書き出す」でタイトル・OS・タグを入れ、マスク済みの設定・理由・メタ情報を保存またはコピーする
 
 **貼り付けた内容を外に出さないための作り**
-- 処理はすべて `@ccpick/core` をブラウザで動かして行う。サーバーは不要
+- 処理はすべて `@ccpluck/core` をブラウザで動かして行う。サーバーは不要
 - 本番ビルドの HTML に CSP を入れ、`connect-src 'none'` で通信を禁止している。外部のフォント・スクリプト・画像も読み込まない
 - 入力も選択も保存しない（localStorage なども使わない）。リロードすると消える
 
@@ -172,7 +172,7 @@ HANDOFF の「未決事項」と、実装中に出てきた判断です。変更
 
 | 項目 | 仮決め | 理由 |
 |---|---|---|
-| サービス名 | **`ccpick`**（npm パッケージ `@ccpick/core`、CLI は `npx ccpick`、保存先 `~/.ccpick/`） | `ccshare` は npm で使用済み（Claude Code のプロンプト共有ツール）、`ccsettings` も使用済み（設定テンプレート適用ツール）で紛らわしい。「設定から項目を選んで取り込む」を表す名前にした。2026-11-18 時点で npm 上は未使用。リポジトリのディレクトリ名は `ccshare` のまま |
+| サービス名 | **`ccpluck`**（npm パッケージ `@ccpluck/core`、CLI は `npx ccpluck`、保存先 `~/.ccpluck/`） | `ccshare` は npm で使用済み（Claude Code のプロンプト共有ツール）、`ccsettings` も使用済み（設定テンプレート適用ツール）で紛らわしい。`ccpick` も GitHub に Claude Code 向けの同名ツールが複数あるため避けた。「設定から項目を 1 つずつ摘み取る（pluck）」を表す名前にした。2026-11-18 時点で npm・GitHub ともに同名なし。GitHub のリポジトリは `shiroinock/ccpluck`（手元のディレクトリ名は `ccshare` のまま） |
 | 共有版のホスティングと DB | **Cloudflare Pages + Workers + D1** | Web は静的ページ + core のブラウザ実行が中心で、サーバーの役割は投稿の保存・検索・GitHub OAuth に限られる。安価で、マイルストーン 3 の静的ページをそのまま載せられる。マイルストーン 4 の着手時に再検討する |
 | 投稿のライセンス | **CC0-1.0 を既定**（`PostMeta.license`、`DEFAULT_LICENSE`） | 設定の断片を気兼ねなく取り込めるようにするため。投稿者が変更できる形にしてある |
 | hook スクリプトの同梱 | **MVP では同梱しない**。参照しているスクリプトを `mergeItems` の `dependencies` で返し、CLI が「依存ファイル不足」として表示する | 任意コードの配布になり安全面の設計が要る。将来同梱する場合は、内容ハッシュでの固定・全文表示・high リスク扱いを前提にする |

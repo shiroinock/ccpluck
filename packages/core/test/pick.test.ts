@@ -11,7 +11,7 @@ import {
 } from "../src/index.js";
 
 const POST = {
-  format: "ccpick-post",
+  format: "ccpluck-post",
   version: 1,
   settings: {
     model: "opus",
@@ -45,14 +45,14 @@ describe("parsePickSource", () => {
 
   it("reads plain settings and bundles", () => {
     expect(parsePickSource({ model: "opus" }).kind).toBe("settings");
-    const b = parsePickSource({ format: "ccpick-bundle", version: 1, items: [{ id: "/model", value: "opus" }], source: { title: "t" } });
+    const b = parsePickSource({ format: "ccpluck-bundle", version: 1, items: [{ id: "/model", value: "opus" }], source: { title: "t" } });
     expect(b.kind).toBe("bundle");
     expect(b.source).toEqual({ title: "t" });
   });
 
   it("reports errors for non-objects", () => {
     expect(parsePickSource([1]).errors.length).toBeGreaterThan(0);
-    expect(parsePickSource({ format: "ccpick-post", settings: 1 }).errors.length).toBeGreaterThan(0);
+    expect(parsePickSource({ format: "ccpluck-post", settings: 1 }).errors.length).toBeGreaterThan(0);
   });
 });
 

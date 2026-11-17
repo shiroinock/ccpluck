@@ -80,7 +80,7 @@ export function nodeContext(): Context {
       }
     },
     async edit(initial) {
-      const dir = await mkdtemp(join(tmpdir(), "ccpick-"));
+      const dir = await mkdtemp(join(tmpdir(), "ccpluck-"));
       const file = join(dir, "why.txt");
       try {
         await writeFile(file, initial, { mode: 0o600 });
@@ -123,7 +123,7 @@ function expandHome(p: string, home: string): string {
 /**
  * 対象ファイルと履歴の保存先を決める。
  * settings: --settings-path > $CLAUDE_CONFIG_DIR/settings.json > ~/.claude/settings.json
- * 履歴:     --data-dir > $CCPICK_HOME > ~/.ccpick
+ * 履歴:     --data-dir > $CCPLUCK_HOME > ~/.ccpluck
  */
 export function resolvePaths(ctx: Context, opts: { settingsPath?: string; dataDir?: string }): Paths {
   const home = ctx.homeDir;
@@ -132,9 +132,9 @@ export function resolvePaths(ctx: Context, opts: { settingsPath?: string; dataDi
     : join(ctx.env.CLAUDE_CONFIG_DIR ? expandHome(ctx.env.CLAUDE_CONFIG_DIR, home) : join(home, ".claude"), "settings.json");
   const dataDir = opts.dataDir
     ? resolve(ctx.cwd, expandHome(opts.dataDir, home))
-    : ctx.env.CCPICK_HOME
-      ? expandHome(ctx.env.CCPICK_HOME, home)
-      : join(home, ".ccpick");
+    : ctx.env.CCPLUCK_HOME
+      ? expandHome(ctx.env.CCPLUCK_HOME, home)
+      : join(home, ".ccpluck");
   return { settingsPath, dataDir };
 }
 

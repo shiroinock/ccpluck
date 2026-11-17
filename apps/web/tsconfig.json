@@ -6,7 +6,7 @@
     "rootDir": "../..",
     "baseUrl": ".",
     "paths": {
-      "@ccpick/core": ["../../packages/core/src/index.ts"]
+      "@ccpluck/core": ["../../packages/core/src/index.ts"]
     }
   },
   "include": ["src", "test", "vite.config.ts"]

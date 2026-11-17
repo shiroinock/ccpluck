@@ -1,4 +1,4 @@
-import type { Item, JsonValue, RiskLevel } from "@ccpick/core";
+import type { Item, JsonValue, RiskLevel } from "@ccpluck/core";
 
 export interface Style {
   bold(s: string): string;

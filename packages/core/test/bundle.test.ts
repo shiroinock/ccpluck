@@ -28,7 +28,7 @@ describe("bundle", () => {
 
   it("rejects tampered items where the id disagrees with the value", () => {
     const parsed = parseBundle({
-      format: "ccpick-bundle",
+      format: "ccpluck-bundle",
       version: 1,
       items: [
         { id: '/permissions/deny/{"Bash(rm *)"}', value: "Bash" },
@@ -44,7 +44,7 @@ describe("bundle", () => {
 
   it("rejects unknown formats and versions", () => {
     expect(parseBundle({ format: "nope" }).errors).toHaveLength(1);
-    expect(parseBundle({ format: "ccpick-bundle", version: 2, items: [] }).errors).toHaveLength(1);
+    expect(parseBundle({ format: "ccpluck-bundle", version: 2, items: [] }).errors).toHaveLength(1);
     expect(parseBundle("x").errors).toHaveLength(1);
   });
 

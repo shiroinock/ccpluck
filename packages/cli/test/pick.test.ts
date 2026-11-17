@@ -1,14 +1,14 @@
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parsePickSource, pickCandidates } from "@ccpick/core";
+import { parsePickSource, pickCandidates } from "@ccpluck/core";
 import { harness, type Harness } from "./harness.js";
 
 const HOOK_ID = '/hooks/PostToolUse/{matcher:"Edit|Write"}/{command:"npx prettier --write ."}';
 const ENV_ID = '/permissions/deny/{"Read(./.env)"}';
 
 function post(settings: Record<string, unknown>, notes: Record<string, { why: string }> = {}) {
-  return { format: "ccpick-post", version: 1, settings, notes, meta: { title: "Web の設定", os: "macos", tags: ["web"] } };
+  return { format: "ccpluck-post", version: 1, settings, notes, meta: { title: "Web の設定", os: "macos", tags: ["web"] } };
 }
 
 const SETTINGS_V1 = {

@@ -7,7 +7,7 @@ import { defineConfig, type Plugin } from "vite";
  * 開発サーバーは HMR の WebSocket を使うので入れない。
  */
 const csp: Plugin = {
-  name: "ccpick-csp",
+  name: "ccpluck-csp",
   apply: "build",
   transformIndexHtml(html) {
     const policy = [
@@ -28,7 +28,7 @@ export default defineConfig({
   plugins: [csp],
   resolve: {
     alias: {
-      "@ccpick/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      "@ccpluck/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
     },
   },
   build: {

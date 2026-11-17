@@ -226,7 +226,7 @@ describe("apply: input sources", () => {
   it("accepts a share post produced by export", async () => {
     const h = harness();
     const post = {
-      format: "ccpick-post",
+      format: "ccpluck-post",
       version: 1,
       settings: { model: "opus", env: { X: "<<MASKED:env.X>>" } },
       notes: { "/model": { why: "精度優先" } },
@@ -253,18 +253,18 @@ describe("apply: input sources", () => {
 });
 
 describe("paths", () => {
-  it("defaults to <home>/.claude/settings.json and <home>/.ccpick", async () => {
+  it("defaults to <home>/.claude/settings.json and <home>/.ccpluck", async () => {
     const h = harness();
     const { run } = await import("../src/index.js");
     const b = h.writeJson("b.json", bundle([{ id: "/model", value: "opus" }]));
     expect(await run(["apply", b, "--yes"], h.ctx)).toBe(0);
     expect(readFileSync(join(h.home, ".claude", "settings.json"), "utf8")).toContain("opus");
-    expect(existsSync(join(h.home, ".ccpick", "imports"))).toBe(true);
+    expect(existsSync(join(h.home, ".ccpluck", "imports"))).toBe(true);
   });
 
-  it("honours CLAUDE_CONFIG_DIR and CCPICK_HOME", async () => {
+  it("honours CLAUDE_CONFIG_DIR and CCPLUCK_HOME", async () => {
     const h = harness();
-    h.ctx.env = { CLAUDE_CONFIG_DIR: join(h.dir, "cfg"), CCPICK_HOME: join(h.dir, "data") };
+    h.ctx.env = { CLAUDE_CONFIG_DIR: join(h.dir, "cfg"), CCPLUCK_HOME: join(h.dir, "data") };
     const { run } = await import("../src/index.js");
     expect(await run(["apply", h.writeJson("b.json", bundle([{ id: "/model", value: "opus" }])), "--yes"], h.ctx)).toBe(0);
     expect(existsSync(join(h.dir, "cfg", "settings.json"))).toBe(true);

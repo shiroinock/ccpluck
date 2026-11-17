@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@ccpick/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
+      "@ccpluck/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
     },
   },
   test: {

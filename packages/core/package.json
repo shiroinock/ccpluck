@@ -1,5 +1,5 @@
 {
-  "name": "@ccpick/core",
+  "name": "@ccpluck/core",
   "version": "0.1.0",
   "description": "Pure functions to decompose, mask, diff, merge and risk-assess Claude Code settings.json (browser + Node)",
   "type": "module",

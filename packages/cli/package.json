@@ -1,10 +1,10 @@
 {
-  "name": "ccpick",
+  "name": "ccpluck",
   "version": "0.1.0",
   "description": "Pick, apply and roll back individual Claude Code settings.json items",
   "type": "module",
   "bin": {
-    "ccpick": "./dist/bin.js"
+    "ccpluck": "./dist/bin.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,7 +18,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ccpick/core": "workspace:*"
+    "@ccpluck/core": "workspace:*"
   },
   "license": "MIT"
 }

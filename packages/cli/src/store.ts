@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ImportBundle, JournalOp } from "@ccpick/core";
+import type { ImportBundle, JournalOp } from "@ccpluck/core";
 import { CliError } from "./context.js";
 import { atomicWrite } from "./fsutil.js";
 
 /**
- * 取り込み 1 回分の記録。~/.ccpick/imports/<id>.json に保存する。
+ * 取り込み 1 回分の記録。~/.ccpluck/imports/<id>.json に保存する。
  * 適用前のファイル全体（beforeText）と、項目ごとのジャーナル（ops）を持つ。
  */
 export interface ImportRecord {

@@ -20,7 +20,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@ccpick/core':
+      '@ccpluck/core':
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
@@ -30,7 +30,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@ccpick/core':
+      '@ccpluck/core':
         specifier: workspace:*
         version: link:../core
 

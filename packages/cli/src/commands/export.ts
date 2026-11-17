@@ -10,7 +10,7 @@ import {
   type MaskFinding,
   type Notes,
   type PostMeta,
-} from "@ccpick/core";
+} from "@ccpluck/core";
 import { CliError, type Context } from "../context.js";
 import { readSettingsFile } from "../fsutil.js";
 import { makeStyle } from "../render.js";

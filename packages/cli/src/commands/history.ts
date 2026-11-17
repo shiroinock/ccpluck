@@ -1,4 +1,4 @@
-import { revertOps, type JournalOp } from "@ccpick/core";
+import { revertOps, type JournalOp } from "@ccpluck/core";
 import { CliError, type Context } from "../context.js";
 import { readSettingsFile, sha256, atomicWrite, writeSettings } from "../fsutil.js";
 import { makeStyle, short } from "../render.js";

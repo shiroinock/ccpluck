@@ -5,11 +5,11 @@ import { afterAll, expect } from "vitest";
 
 /**
  * テストが実ユーザーのホームディレクトリに書き込まないようにする。
- * - HOME / CLAUDE_CONFIG_DIR / CCPICK_HOME を一時ディレクトリに向ける
- * - テストの前後で本物の ~/.claude/settings.json と ~/.ccpick が変わっていないことを確かめる
+ * - HOME / CLAUDE_CONFIG_DIR / CCPLUCK_HOME を一時ディレクトリに向ける
+ * - テストの前後で本物の ~/.claude/settings.json と ~/.ccpluck が変わっていないことを確かめる
  */
 const realHome = userInfo().homedir;
-const watched = [join(realHome, ".claude", "settings.json"), join(realHome, ".ccpick")];
+const watched = [join(realHome, ".claude", "settings.json"), join(realHome, ".ccpluck")];
 const snapshot = () =>
   watched.map((p) => {
     try {
@@ -21,11 +21,11 @@ const snapshot = () =>
   });
 const before = snapshot();
 
-const fakeHome = mkdtempSync(join(tmpdir(), "ccpick-home-"));
+const fakeHome = mkdtempSync(join(tmpdir(), "ccpluck-home-"));
 process.env.HOME = fakeHome;
 process.env.USERPROFILE = fakeHome;
 process.env.CLAUDE_CONFIG_DIR = join(fakeHome, ".claude");
-process.env.CCPICK_HOME = join(fakeHome, ".ccpick");
+process.env.CCPLUCK_HOME = join(fakeHome, ".ccpluck");
 
 afterAll(() => {
   expect(snapshot()).toEqual(before);

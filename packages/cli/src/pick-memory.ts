@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { JsonValue, PickDecision } from "@ccpick/core";
+import type { JsonValue, PickDecision } from "@ccpluck/core";
 import { atomicWrite } from "./fsutil.js";
 
 /**
- * 同じ投稿を前に pick したときの決定。~/.ccpick/picks/<投稿の参照のハッシュ>.json に保存する。
+ * 同じ投稿を前に pick したときの決定。~/.ccpluck/picks/<投稿の参照のハッシュ>.json に保存する。
  * 2 回目以降の pick で、前回決めた項目（値が変わっていないもの）をもう一度聞かないために使う。
  */
 export interface PickMemory {
@@ -52,7 +52,7 @@ export class PickMemoryStore {
 }
 
 /**
- * 前に publish したときの決定。~/.ccpick/publish/<書き出し先のハッシュ>.json に保存する。
+ * 前に publish したときの決定。~/.ccpluck/publish/<書き出し先のハッシュ>.json に保存する。
  * `publish --update` で、前回決めた項目（値が変わっていないもの）をもう一度聞かないために使う。
  * 項目 ID はマスク後のもの。
  */

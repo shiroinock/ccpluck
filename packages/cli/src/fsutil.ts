@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, basename } from "node:path";
-import { validateSettings, type Settings } from "@ccpick/core";
+import { validateSettings, type Settings } from "@ccpluck/core";
 import { CliError } from "./context.js";
 
 export interface SettingsFile {

@@ -6,36 +6,36 @@ import { runPick } from "./commands/pick.js";
 import { runPublish } from "./commands/publish.js";
 import { CliError, resolvePaths, type Context } from "./context.js";
 
-export const USAGE = `ccpick — Claude Code の settings.json を項目単位で取り込み・巻き戻す
+export const USAGE = `ccpluck — Claude Code の settings.json を項目単位で取り込み・巻き戻す
 
 使い方:
-  ccpick pick <投稿>           投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む
+  ccpluck pick <投稿>           投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む
                                <投稿> は投稿・バンドル・settings.json のファイルか https URL
                                自分の settings.json と比べ、足りない項目・作者が理由を書いた項目から出す
       --all                    前回決めた項目も出す
       --only <itemId>          対話せず、指定した項目だけを取り込む（複数可）
       --yes-low                対話せず、low で自分の設定にない項目だけを取り込む
       --yes / --allow-high <itemId> / --dry-run   apply と同じ
-  ccpick publish               自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る
-      -o, --output <file>      書き出し先（既定: --update の投稿、なければ ./ccpick-post.json）
+  ccpluck publish               自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る
+      -o, --output <file>      書き出し先（既定: --update の投稿、なければ ./ccpluck-post.json）
       --update <post>          前に書き出した投稿の選択と理由を引き継ぎ、変わったところだけ聞く
       --public-env <KEY,...>   値を公開してよい env のキー（カードの [v] でも切り替えられる）
       --title <text> --os <macos|linux|windows|wsl|other> --tag <tag>
       --yes                    最後の確認を省略する
-  ccpick apply <bundle>        差分とリスクを表示し、確認してから適用する
+  ccpluck apply <bundle>        差分とリスクを表示し、確認してから適用する
                                <bundle> はファイル、https URL、または - (標準入力)
       --yes                    全体の確認を省略する（high リスク項目は別途確認が必要）
       --allow-high <itemId>    非対話で high リスク項目を適用する（項目ごとに指定、複数可）
       --overwrite              衝突したら上書きする
       --skip-conflicts         衝突したらスキップする
       --dry-run                書き込まずに計画だけ表示する
-  ccpick history [importId]    取り込み履歴の一覧（ID を渡すと詳細）
+  ccpluck history [importId]    取り込み履歴の一覧（ID を渡すと詳細）
       --json
-  ccpick undo <importId>       取り込み単位で戻す
+  ccpluck undo <importId>       取り込み単位で戻す
       --force                  適用後に変更された項目を残して、ほかを戻す
-  ccpick revert <itemId>       項目単位で戻す（適用後に変更されていたら止める）
+  ccpluck revert <itemId>       項目単位で戻す（適用後に変更されていたら止める）
       --import <importId>      どの取り込みの操作を戻すか指定する
-  ccpick export --mask         手元の設定をマスクして投稿用の JSON を作る
+  ccpluck export --mask         手元の設定をマスクして投稿用の JSON を作る
       --public-env <KEY,...>   値を公開してよい env のキー
       --notes <file>           項目ごとの注釈（{ "<itemId>": { "why": "..." } }）
       --title <text> --os <macos|linux|windows|wsl|other> --tag <tag> --license <SPDX>
@@ -44,7 +44,7 @@ export const USAGE = `ccpick — Claude Code の settings.json を項目単位�
 
 共通オプション:
   --settings-path <path>       対象の settings.json（既定: ~/.claude/settings.json）
-  --data-dir <path>            履歴の保存先（既定: ~/.ccpick）
+  --data-dir <path>            履歴の保存先（既定: ~/.ccpluck）
   -h, --help
 `;
 

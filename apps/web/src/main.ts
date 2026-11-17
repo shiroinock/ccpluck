@@ -1,4 +1,4 @@
-import type { PostMeta, RiskLevel } from "@ccpick/core";
+import type { PostMeta, RiskLevel } from "@ccpluck/core";
 import {
   attentionFor,
   buildBundle,
@@ -69,14 +69,14 @@ const cur = () => state.sessions[state.purpose];
 const WORDS = {
   pick: {
     inputTitle: "もらう設定",
-    placeholder: "誰かが公開した投稿（ccpick の JSON）か、settings.json をそのまま貼り付けてください",
+    placeholder: "誰かが公開した投稿（ccpluck の JSON）か、settings.json をそのまま貼り付けてください",
     sample: "サンプルの投稿を読み込む",
     yes: "もらう",
     no: "もらわない",
     empty: "左に誰かの投稿を貼り付けると、あなたに役立ちそうな項目から順に出てきます。",
     output: "取り込み用に書き出す",
     summary: (n: number) => `${n} 件をもらう`,
-    endNote: "下の「取り込み用に書き出す」で保存し、手元で npx ccpick apply に渡すと settings.json に入ります。",
+    endNote: "下の「取り込み用に書き出す」で保存し、手元で npx ccpluck apply に渡すと settings.json に入ります。",
     hint: {
       timeline: "あなたに足りない項目、作者が理由を書いている項目から順に 1 件ずつ出します。",
       list: "投稿の項目を種類ごとに並べます。自分で探して選べます。",
@@ -782,20 +782,20 @@ function renderOutput(): void {
   $("output-title").textContent = words().output;
 
   if (state.purpose === "pick") {
-    outputName = "ccpick-bundle.json";
+    outputName = "ccpluck-bundle.json";
     // 作者の理由も一緒に持っていく（apply の確認画面と履歴に出る）
     const notes = Object.fromEntries(m.rows.flatMap((r) => (r.authorWhy ? [[r.key, r.authorWhy]] : [])));
     const title = s.source?.meta?.title;
     outputText = toJsonText(buildBundle(m.rows, s.selected, notes, title ? { title } : undefined));
     noteEl.replaceChildren(
-      h("p", { text: "保存したファイルを手元で次のコマンドに渡すと、選んだ項目だけがあなたの settings.json に入ります。high リスクの項目と、値が違う項目は適用前にもう一度確認されます。いつでも ccpick undo で戻せます。" }),
-      h("code", { class: "command", text: `npx ccpick apply ${outputName}` }),
+      h("p", { text: "保存したファイルを手元で次のコマンドに渡すと、選んだ項目だけがあなたの settings.json に入ります。high リスクの項目と、値が違う項目は適用前にもう一度確認されます。いつでも ccpluck undo で戻せます。" }),
+      h("code", { class: "command", text: `npx ccpluck apply ${outputName}` }),
     );
     setOutputJson();
     return;
   }
 
-  outputName = "ccpick-post.json";
+  outputName = "ccpluck-post.json";
   const title = h("input", { type: "text", value: state.meta.title, "aria-label": "タイトル", placeholder: "タイトル（例: Web フロントエンド開発の設定）" });
   const os = h(
     "select",

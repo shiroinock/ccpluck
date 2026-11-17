@@ -17,7 +17,7 @@ import {
   type Notes,
   type PickCandidate,
   type PickState,
-} from "@ccpick/core";
+} from "@ccpluck/core";
 import { CliError, type Context } from "../context.js";
 import { readSettingsFile } from "../fsutil.js";
 import { PickMemoryStore, valueHash, type PickMemory } from "../pick-memory.js";

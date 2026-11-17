@@ -46,7 +46,7 @@ export const SAMPLE = `{
 
 /** 「サンプルの投稿を読み込む」用。誰かが公開画面から書き出した投稿、という想定（架空） */
 export const SAMPLE_POST = `{
-  "format": "ccpick-post",
+  "format": "ccpluck-post",
   "version": 1,
   "settings": {
     "model": "opus",

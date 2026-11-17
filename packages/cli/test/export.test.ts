@@ -43,7 +43,7 @@ describe("export --mask", () => {
     const text = readFileSync(join(h.dir, "post.json"), "utf8");
     expect(text).not.toMatch(/ghp_|sk-ant|taro/);
     const post = JSON.parse(text);
-    expect(post.format).toBe("ccpick-post");
+    expect(post.format).toBe("ccpluck-post");
     expect(post.meta).toEqual({ license: "CC0-1.0", os: "macos", tags: ["web", "safety"] });
     expect(post.settings.env).toEqual({ GITHUB_TOKEN: "<<MASKED:env.GITHUB_TOKEN>>", DISABLE_TELEMETRY: "1" });
     expect(post.notes).toEqual({
@@ -79,7 +79,7 @@ describe("cli basics", () => {
   it("prints usage and rejects unknown commands/options", async () => {
     const h = harness();
     expect(await h.cli("--help")).toBe(0);
-    expect(h.out()).toContain("ccpick apply");
+    expect(h.out()).toContain("ccpluck apply");
     expect(await h.cli("frobnicate")).toBe(1);
     expect(await h.cli("apply", "x", "--bogus")).toBe(1);
     expect(h.err()).toContain("エラー");

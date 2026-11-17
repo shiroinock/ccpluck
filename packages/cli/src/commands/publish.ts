@@ -17,7 +17,7 @@ import {
   type PickState,
   type PostMeta,
   type PublishCandidate,
-} from "@ccpick/core";
+} from "@ccpluck/core";
 import { CliError, type Context } from "../context.js";
 import { atomicWrite, exists, readSettingsFile } from "../fsutil.js";
 import { PublishMemoryStore, valueHash, type PublishMemory } from "../pick-memory.js";
@@ -28,7 +28,7 @@ import { highlightMarkers, osFromPlatform } from "./export.js";
 export interface PublishOptions {
   settingsPath: string;
   dataDir: string;
-  /** 書き出し先（既定は --update の投稿、なければ ./ccpick-post.json） */
+  /** 書き出し先（既定は --update の投稿、なければ ./ccpluck-post.json） */
   output?: string;
   /** 前に書き出した投稿。選択と理由を引き継ぎ、変わったところだけ聞く */
   update?: string;
@@ -53,17 +53,17 @@ export async function runPublish(ctx: Context, opts: PublishOptions): Promise<nu
   const { io } = ctx;
   const s = makeStyle(io.color);
   if (!io.interactive) {
-    throw new CliError("publish は公開する項目を 1 件ずつ確かめて決めます。端末で実行してください（全部をマスクして書き出すなら ccpick export --mask）");
+    throw new CliError("publish は公開する項目を 1 件ずつ確かめて決めます。端末で実行してください（全部をマスクして書き出すなら ccpluck export --mask）");
   }
   const file = await readSettingsFile(opts.settingsPath);
   if (file.text === null) throw new CliError(`${opts.settingsPath} がありません`);
 
   // 1. 前回の投稿と決定を読む
   const updatePath = opts.update ? resolve(ctx.cwd, opts.update) : undefined;
-  const outPath = resolve(ctx.cwd, opts.output ?? opts.update ?? "ccpick-post.json");
+  const outPath = resolve(ctx.cwd, opts.output ?? opts.update ?? "ccpluck-post.json");
   const prev = updatePath ? parsePickSource(await loadJsonInput(ctx, updatePath, "前回の投稿")) : undefined;
   if (prev && (prev.kind !== "post" || prev.errors.length > 0)) {
-    throw new CliError(`${updatePath} は ccpick の投稿ではありません${prev.errors.length > 0 ? `: ${prev.errors.join(", ")}` : ""}`);
+    throw new CliError(`${updatePath} は ccpluck の投稿ではありません${prev.errors.length > 0 ? `: ${prev.errors.join(", ")}` : ""}`);
   }
   const memStore = new PublishMemoryStore(opts.dataDir);
   const memory = updatePath ? await memStore.load(updatePath) : undefined;
@@ -229,8 +229,8 @@ export async function runPublish(ctx: Context, opts: PublishOptions): Promise<nu
   await memStore.save(mem);
 
   io.err(s.green(`\n書き出しました: ${outPath}`));
-  io.err(s.dim(`もらう人は ccpick pick ${outPath} で、欲しい項目だけを取り込めます`));
-  io.err(s.dim(`設定を変えたら ccpick publish --update ${outPath} で、変わったところだけ聞きます`));
+  io.err(s.dim(`もらう人は ccpluck pick ${outPath} で、欲しい項目だけを取り込めます`));
+  io.err(s.dim(`設定を変えたら ccpluck publish --update ${outPath} で、変わったところだけ聞きます`));
   return 0;
 }
 

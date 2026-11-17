@@ -38,7 +38,7 @@ import {
   type SharePost,
   type JsonValue,
   type Warning,
-} from "@ccpick/core";
+} from "@ccpluck/core";
 
 /** 画面の目的。もらう＝他人の設定から取り込む／公開する＝自分の設定を投稿する */
 export type Purpose = "pick" | "publish";
@@ -78,13 +78,13 @@ export interface Source {
   /** 作者の注釈（項目 ID → 理由） */
   notes: Notes;
   meta?: PostMeta;
-  /** ccpick の投稿形式だったか（素の settings.json なら false） */
+  /** ccpluck の投稿形式だったか（素の settings.json なら false） */
   isPost: boolean;
   warnings: Warning[];
 }
 
 /**
- * 「もらう」側の入力。ccpick の投稿（export --mask や公開画面の出力）と、素の settings.json のどちらも受け付ける。
+ * 「もらう」側の入力。ccpluck の投稿（export --mask や公開画面の出力）と、素の settings.json のどちらも受け付ける。
  */
 export function parseSource(text: string): { ok: true; source: Source } | { ok: false; error: string } {
   let raw: unknown;
@@ -136,7 +136,7 @@ export interface Options {
 }
 
 /** 自分の settings.json との比較は core と共通 */
-export { compareWithMine, type MineStatus } from "@ccpick/core";
+export { compareWithMine, type MineStatus } from "@ccpluck/core";
 
 export interface Row {
   /** 選択や注釈の状態を持つキー。マスクの有無で変わらないよう、元の項目 ID を使う */

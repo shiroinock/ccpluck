@@ -24,7 +24,7 @@ export interface PickSource {
 }
 
 /**
- * もらう側の入力を読む。投稿（ccpick-post）、import バンドル、素の settings.json のどれでもよい。
+ * もらう側の入力を読む。投稿（ccpluck-post）、import バンドル、素の settings.json のどれでもよい。
  * 外部から来た JSON なので、形の検証は parseBundle / validateSettings に任せる。
  */
 export function parsePickSource(raw: unknown): PickSource {
