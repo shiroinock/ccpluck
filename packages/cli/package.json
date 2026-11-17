@@ -1,0 +1,24 @@
+{
+  "name": "ccpick",
+  "version": "0.1.0",
+  "description": "Pick, apply and roll back individual Claude Code settings.json items",
+  "type": "module",
+  "bin": {
+    "ccpick": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ccpick/core": "workspace:*"
+  },
+  "license": "MIT"
+}

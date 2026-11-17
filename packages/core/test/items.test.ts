@@ -232,3 +232,16 @@ describe("get / upsert / remove", () => {
     expect(() => itemFromId("/__proto__/x", 1)).toThrow();
   });
 });
+
+describe("withValue", () => {
+  it("rebuilds ids that depend on the value", async () => {
+    const { withValue } = await import("../src/index.js");
+    const [hook] = decompose({ hooks: { Stop: [{ matcher: "x", hooks: [{ type: "command", command: "<<MASKED:a>>" }] }] } }).items;
+    const filled = withValue(hook!, { type: "command", command: "say hi" });
+    expect(filled.id).toBe('/hooks/Stop/{matcher:"x"}/{command:"say hi"}');
+    const [elem] = decompose({ permissions: { allow: ["A"] } }).items;
+    expect(withValue(elem!, "B").id).toBe('/permissions/allow/{"B"}');
+    const [scalar] = decompose({ model: "a" }).items;
+    expect(withValue(scalar!, "b")).toMatchObject({ id: "/model", value: "b" });
+  });
+});

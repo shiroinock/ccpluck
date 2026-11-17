@@ -11,7 +11,7 @@ Claude Code の `settings.json` を **項目単位で** 共有・取り込み・
 
 ```
 packages/core   # 解析・項目分解・マスク・差分・マージ・リスク判定（純粋関数、I/O なし）← 実装済み
-packages/cli    # ローカル CLI（マイルストーン 2）
+packages/cli    # ローカル CLI。~/.claude/settings.json の読み書き・履歴・巻き戻し ← 実装済み
 apps/web        # 閲覧・投稿・項目選択 UI（マイルストーン 3〜）
 ```
 
@@ -31,8 +31,8 @@ Node 22 と pnpm 10 で確認しています。
 
 | マイルストーン | 状態 |
 |---|---|
-| 1. core | ✅ 項目分解・リスク判定・マスク・マージ・差分・巻き戻し・バンドル・検証。フィクスチャ 9 個、テスト 119 件 |
-| 2. cli | 未着手 |
+| 1. core | ✅ 項目分解・リスク判定・マスク・マージ・差分・巻き戻し・バンドル・検証。フィクスチャ 9 個、テスト 120 件 |
+| 2. cli | ✅ `export --mask` / `apply` / `history` / `undo` / `revert`。テスト 37 件 |
 | 3. web（ローカル版） | 未着手 |
 | 4. web（共有版） | 未着手 |
 | 5. 集計 | 未着手 |
@@ -71,14 +71,49 @@ Node 22 と pnpm 10 で確認しています。
 - `{"..."}` は配列の要素、`{name:"..."}` は hook の matcher や command（中身は JSON 文字列リテラル）
 - matcher のない hook グループは `{}`（例: `/hooks/Stop/{}/{command:"say done"}`）
 
-### 受け入れ条件との対応（core 分）
+## `ccpick`（CLI）
+
+```bash
+pnpm build
+node packages/cli/dist/bin.js --help      # 公開後は npx ccpick
+```
+
+| コマンド | 内容 |
+|---|---|
+| `ccpick apply <bundle>` | 差分とリスクを表示 → 確認 → 適用。`<bundle>` はファイル、https URL、`-`（標準入力）。import バンドルと投稿（`export` の出力）のどちらも受け付ける |
+| `ccpick history [importId]` | 取り込み履歴の一覧／詳細（`--json`） |
+| `ccpick undo <importId>` | 取り込み単位で戻す |
+| `ccpick revert <itemId>` | 項目単位で戻す（`--import <importId>` で対象の取り込みを指定） |
+| `ccpick export --mask` | 手元の設定をマスクして投稿用 JSON を作る（`--public-env`、`--notes`、`--tag`、`-o`） |
+
+共通オプション: `--settings-path`（既定 `$CLAUDE_CONFIG_DIR/settings.json`、なければ `~/.claude/settings.json`）、`--data-dir`（既定 `$CCPICK_HOME`、なければ `~/.ccpick`）。
+
+**apply の流れ**
+1. バンドルを検証する。ID と値が食い違う項目が 1 つでもあれば全体を中止する
+2. マスク値を含む項目は、対話時は値を入力させ（空ならスキップ）、非対話時はスキップする
+3. 衝突（既存の値と違うスカラー・env キー）は項目ごとに上書き／スキップを選ぶ。非対話時は `--overwrite` / `--skip-conflicts`、指定がなければスキップ
+4. high リスク項目は内容全文と理由を表示し、`yes` の入力を求める。非対話時は `--allow-high <itemId>` で項目ごとに明示しない限り適用しない（`--yes` では適用されない）
+5. 計画（追加／置換／スキップ）、allow と deny の矛盾、依存ファイル不足を表示し、全体の確認（`y` または `--yes`）を求める。`--dry-run` はここで止まる
+6. 履歴を記録してから、一時ファイルに書いて rename する。書き込む前に、書き込む文字列そのものを検証する
+
+**履歴** は `~/.ccpick/imports/<importId>.json` に 1 回の取り込みごとに保存する。適用前のファイル全体（`beforeText`）、適用直後の sha256、項目ごとのジャーナル（`{itemId, op, before, after}`）、revert 済みの項目を持つ。
+
+**undo** は、ファイルが適用直後のまま（sha256 一致）なら適用前の中身をそのまま書き戻す（バイト一致。適用前にファイルがなければ削除する）。その後にファイルが変わっていれば、ジャーナルから項目ごとに戻し、適用後に手で変更された項目があれば止める（`--force` で変更されていない項目だけ戻す）。
+
+**revert** は、その項目を最後に適用した取り込みの操作だけを取り消す。適用後に手で変更されていれば止める。
+
+**テストと実ホーム**: CLI のテストは `test/setup.ts` で `HOME` / `CLAUDE_CONFIG_DIR` / `CCPICK_HOME` を一時ディレクトリに向け、すべてのコマンドに一時ディレクトリの `--settings-path` / `--data-dir` を渡す。さらにテストの前後で本物の `~/.claude/settings.json` と `~/.ccpick` の更新時刻とサイズが変わっていないことを検査している。
+
+## 受け入れ条件との対応
 
 | 条件 | テスト |
 |---|---|
 | 項目に分解して全部適用すると意味的に同じ JSON になる | `items.test.ts` の round trip（全フィクスチャはキー順までバイト一致。ランダム生成 200 件でも確認）、`merge.test.ts` の「applying every item onto {}」 |
 | 既知の秘密パターンがマスク済み出力に残らない | `mask.test.ts` の「leaves no known secret」（全フィクスチャ） |
 | high リスクの項目は確認なしでは適用できない | `merge.test.ts` の「refuses high-risk items unless confirmed」。`mergeItems` は `confirmedHighRisk` に ID がない high 項目を適用しない |
-| `apply` → `undo` でバイト一致 / 実ホームに書かない | CLI（マイルストーン 2）で担保 |
+| `apply` の後に `undo` するとバイト単位で一致 | `cli/test/apply.test.ts` の「restores the file byte-for-byte」（タブインデント・末尾改行なしの崩れた書式で確認）、「creates the file when absent and removes it again」、`history.test.ts` の「restores bytes exactly after undoing the newer import first」 |
+| high リスク項目は CLI でも確認なしに適用されない | `apply.test.ts` の「never applies high items non-interactively without --allow-high, even with --yes」「requires typing 'yes'」 |
+| テストが実ユーザーのホームに書き込まない | `cli/test/setup.ts`（上記） |
 
 ## 仮決めした事項
 
@@ -93,6 +128,17 @@ HANDOFF の「未決事項」と、実装中に出てきた判断です。変更
 | 投稿のライセンス | **CC0-1.0 を既定**（`PostMeta.license`、`DEFAULT_LICENSE`） | 設定の断片を気兼ねなく取り込めるようにするため。投稿者が変更できる形にしてある |
 | hook スクリプトの同梱 | **MVP では同梱しない**。参照しているスクリプトを `mergeItems` の `dependencies` で返し、CLI が「依存ファイル不足」として表示する | 任意コードの配布になり安全面の設計が要る。将来同梱する場合は、内容ハッシュでの固定・全文表示・high リスク扱いを前提にする |
 | プロジェクトスコープと `~/.claude.json` | **MVP は `~/.claude/settings.json` のみ**。`.claude/settings.json` と `settings.local.json` は後で `--scope` で対応。`~/.claude.json`（MCP 設定など）は扱わない | HANDOFF の方針どおり。`~/.claude.json` には OAuth 情報なども入るため対象外のままにする |
+
+### CLI の実装上の判断
+
+- `export` は MVP では `--mask` 必須。マスクせずに書き出す機能は用意していない
+- `export` は確認画面（マスク結果の一覧と公開される JSON 全体）を必ず表示し、`y` か `--yes` がなければ書き出さない。確認画面は標準エラーに出し、標準出力は JSON だけにする
+- マスクでパスやコマンドが書き換わると項目 ID も変わるので、`--notes` の注釈のキーはマスク後の ID に付け替える
+- `apply` の URL は https のみ（`http://localhost` は開発用に許可）
+- 書き戻すときは既存ファイルのインデント（スペース数／タブ）と末尾改行の有無を引き継ぐ。キーの並びは保つが、配列の 1 行書きなど細かい書式は `JSON.stringify` の形になる（undo はバイト一致で戻る）
+- 書き込むファイルのパーミッションは既存のものを引き継ぐ（新規は 0600）
+- 依存ファイルの確認は `~` / `$HOME` 起点と絶対パスのみ。`$CLAUDE_PROJECT_DIR` 起点のものは「確認していない」として別に表示する
+- マスク値を埋めた hook は、埋めた値で項目 ID を作り直す（core の `withValue`）
 
 ### core の実装上の判断
 

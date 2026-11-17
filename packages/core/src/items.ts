@@ -494,3 +494,22 @@ export function describeItem(item: Item): string | undefined {
   }
   return top !== undefined && Object.hasOwn(TOP_LEVEL_KEYS, top) ? TOP_LEVEL_KEYS[top]?.description : undefined;
 }
+
+/**
+ * 値を差し替えた項目を返す。配列要素や hook のように ID が値から決まる項目は ID も作り直す。
+ * 取り込み時にマスク値を埋めたときなどに使う。
+ */
+export function withValue(item: Item, value: JsonValue): Item {
+  switch (item.kind) {
+    case "array-element":
+      return itemFromId(idForElem(item.path, value as string), value);
+    case "hook":
+      return itemFromId(
+        idForHook(item.hook?.event ?? (item.path[1] as string), item.hook?.matcher, value),
+        value,
+        item.hook?.groupExtra,
+      );
+    default:
+      return { ...item, value };
+  }
+}
