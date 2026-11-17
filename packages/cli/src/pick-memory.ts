@@ -50,3 +50,40 @@ export class PickMemoryStore {
     await atomicWrite(this.file(m.sourceKey), `${JSON.stringify(m, null, 2)}\n`);
   }
 }
+
+/**
+ * 前に publish したときの決定。~/.ccpick/publish/<書き出し先のハッシュ>.json に保存する。
+ * `publish --update` で、前回決めた項目（値が変わっていないもの）をもう一度聞かないために使う。
+ * 項目 ID はマスク後のもの。
+ */
+export interface PublishMemory {
+  version: 1;
+  /** 書き出した投稿ファイルの絶対パス */
+  outputPath: string;
+  updatedAt: string;
+  publicEnv: string[];
+  decisions: Record<string, { decision: PickDecision; valueHash: string; at: string }>;
+}
+
+export class PublishMemoryStore {
+  constructor(public readonly dataDir: string) {}
+
+  private file(outputPath: string): string {
+    const h = createHash("sha256").update(outputPath, "utf8").digest("hex").slice(0, 32);
+    return join(this.dataDir, "publish", `${h}.json`);
+  }
+
+  async load(outputPath: string): Promise<PublishMemory | undefined> {
+    try {
+      const m = JSON.parse(await readFile(this.file(outputPath), "utf8")) as PublishMemory;
+      return m.version === 1 && m.outputPath === outputPath ? m : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async save(m: PublishMemory): Promise<void> {
+    await mkdir(join(this.dataDir, "publish"), { recursive: true, mode: 0o700 });
+    await atomicWrite(this.file(m.outputPath), `${JSON.stringify(m, null, 2)}\n`);
+  }
+}

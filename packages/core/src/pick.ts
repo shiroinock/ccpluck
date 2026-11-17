@@ -140,9 +140,15 @@ export interface PickState {
 
 export const emptyPickState = (): PickState => ({ decisions: {}, log: [], deferred: [] });
 
-export interface PickView {
+/** 1 件ずつ決める対象。もらう側（PickCandidate）と公開する側（PublishCandidate）で共通 */
+export interface TimelineCandidate {
+  item: Item;
+  attention: Attention;
+}
+
+export interface PickView<C extends TimelineCandidate = PickCandidate> {
   /** いま見る項目。すべて決め終えたら undefined */
-  current: PickCandidate | undefined;
+  current: C | undefined;
   /** current があとで回しにしたものか */
   currentIsDeferred: boolean;
   /** タイムラインに出す件数（すでに持っている項目を除く） */
@@ -150,11 +156,11 @@ export interface PickView {
   /** 決めた件数 */
   decided: number;
   /** すでに持っているので出さない項目 */
-  already: PickCandidate[];
+  already: C[];
 }
 
-/** 次に見る項目を決める。candidates は pickCandidates の順であること */
-export function pickView(candidates: PickCandidate[], state: PickState): PickView {
+/** 次に見る項目を決める。candidates は注意の順（pickCandidates / publishCandidates の順）であること */
+export function pickView<C extends TimelineCandidate>(candidates: C[], state: PickState): PickView<C> {
   const shown = candidates.filter((c) => c.attention.rank !== RANK_ALREADY);
   const undecided = shown.filter((c) => !Object.hasOwn(state.decisions, c.item.id));
   const deferred = new Set(state.deferred);

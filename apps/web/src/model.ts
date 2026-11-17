@@ -18,6 +18,7 @@ import {
   maskSettings,
   maskedItemPairs,
   pickAttention,
+  publishAttention,
   itemGroup,
   itemLabel,
   itemValueText,
@@ -364,11 +365,7 @@ export interface Attention {
  * 5. low
  */
 export function attentionOf(row: Row): Attention {
-  if (row.hasMasked) return { rank: 0, reason: "マスクした値を含みます" };
-  if (row.risk.level === "high") return { rank: 1, reason: "high リスクです" };
-  if (hintCount(row) > 0) return { rank: 2, reason: "社内のホスト名などを含みます" };
-  if (row.risk.level === "medium") return { rank: 3, reason: "medium リスクです" };
-  return { rank: 4, reason: "low リスクです" };
+  return publishAttention({ hasMasked: row.hasMasked, risk: row.risk.level, hints: hintCount(row) });
 }
 
 /**

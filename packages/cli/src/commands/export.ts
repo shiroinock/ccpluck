@@ -28,7 +28,7 @@ export interface ExportOptions {
   yes: boolean;
 }
 
-function osFromPlatform(p: NodeJS.Platform): PostMeta["os"] {
+export function osFromPlatform(p: NodeJS.Platform): PostMeta["os"] {
   return p === "darwin" ? "macos" : p === "linux" ? "linux" : p === "win32" ? "windows" : "other";
 }
 
@@ -86,7 +86,7 @@ export async function runExport(ctx: Context, opts: ExportOptions): Promise<numb
   return 0;
 }
 
-function highlightMarkers(text: string, paint: (s: string) => string): string {
+export function highlightMarkers(text: string, paint: (s: string) => string): string {
   return text.replace(/<<MASKED:[^<>]+>>/g, (m) => paint(m));
 }
 

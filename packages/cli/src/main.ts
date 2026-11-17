@@ -3,6 +3,7 @@ import { runApply } from "./commands/apply.js";
 import { runExport } from "./commands/export.js";
 import { runHistory, runRevert, runUndo } from "./commands/history.js";
 import { runPick } from "./commands/pick.js";
+import { runPublish } from "./commands/publish.js";
 import { CliError, resolvePaths, type Context } from "./context.js";
 
 export const USAGE = `ccpick — Claude Code の settings.json を項目単位で取り込み・巻き戻す
@@ -15,6 +16,12 @@ export const USAGE = `ccpick — Claude Code の settings.json を項目単位�
       --only <itemId>          対話せず、指定した項目だけを取り込む（複数可）
       --yes-low                対話せず、low で自分の設定にない項目だけを取り込む
       --yes / --allow-high <itemId> / --dry-run   apply と同じ
+  ccpick publish               自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る
+      -o, --output <file>      書き出し先（既定: --update の投稿、なければ ./ccpick-post.json）
+      --update <post>          前に書き出した投稿の選択と理由を引き継ぎ、変わったところだけ聞く
+      --public-env <KEY,...>   値を公開してよい env のキー（カードの [v] でも切り替えられる）
+      --title <text> --os <macos|linux|windows|wsl|other> --tag <tag>
+      --yes                    最後の確認を省略する
   ccpick apply <bundle>        差分とリスクを表示し、確認してから適用する
                                <bundle> はファイル、https URL、または - (標準入力)
       --yes                    全体の確認を省略する（high リスク項目は別途確認が必要）
@@ -56,6 +63,16 @@ const COMMANDS = {
     yes: { type: "boolean", short: "y" },
     "allow-high": { type: "string", multiple: true },
     "dry-run": { type: "boolean" },
+  },
+  publish: {
+    ...COMMON,
+    output: { type: "string", short: "o" },
+    update: { type: "string" },
+    "public-env": { type: "string", multiple: true },
+    title: { type: "string" },
+    os: { type: "string" },
+    tag: { type: "string", multiple: true },
+    yes: { type: "boolean", short: "y" },
   },
   apply: {
     ...COMMON,
@@ -139,6 +156,18 @@ async function dispatch(cmd: CommandName, args: string[], ctx: Context): Promise
         yes: Boolean(o.yes),
         allowHigh: (o["allow-high"] as string[] | undefined) ?? [],
         dryRun: Boolean(o["dry-run"]),
+      });
+    case "publish":
+      if (positionals.length > 0) throw new CliError("publish は位置引数を取りません");
+      return runPublish(ctx, {
+        ...paths,
+        publicEnv: list("public-env"),
+        tags: list("tag"),
+        yes: Boolean(o.yes),
+        ...(o.output ? { output: o.output as string } : {}),
+        ...(o.update ? { update: o.update as string } : {}),
+        ...(o.title ? { title: o.title as string } : {}),
+        ...(o.os ? { os: o.os as string } : {}),
       });
     case "apply": {
       if (o.overwrite && o["skip-conflicts"]) throw new CliError("--overwrite と --skip-conflicts は同時に指定できません");

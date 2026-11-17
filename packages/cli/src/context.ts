@@ -1,4 +1,6 @@
-import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
@@ -18,6 +20,8 @@ export interface Io {
    * 用意がない環境では ask で 1 行を読んで代わりにする
    */
   key?(prompt: string, keys: string[]): Promise<string>;
+  /** エディタ（$VISUAL / $EDITOR）で文章を書いてもらう。用意がない環境では undefined */
+  edit?(initial: string): Promise<string>;
   /** 標準入力全体（`apply -` 用） */
   readStdin(): Promise<string>;
   color: boolean;
@@ -73,6 +77,20 @@ export function nodeContext(): Context {
       } finally {
         stdin.setRawMode(false);
         stdin.pause();
+      }
+    },
+    async edit(initial) {
+      const dir = await mkdtemp(join(tmpdir(), "ccpick-"));
+      const file = join(dir, "why.txt");
+      try {
+        await writeFile(file, initial, { mode: 0o600 });
+        const editor = process.env.VISUAL || process.env.EDITOR || "vi";
+        // エディタ名に引数が含まれることがある（"code --wait" など）
+        const r = spawnSync(`${editor} "${file}"`, { stdio: "inherit", shell: true });
+        if (r.status !== 0) throw new CliError(`エディタが異常終了しました: ${editor}`);
+        return await readFile(file, "utf8");
+      } finally {
+        await rm(dir, { recursive: true, force: true });
       }
     },
     async readStdin() {
