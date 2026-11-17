@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": ["Bash", "Bash(*)", "Edit", "mcp__github__create_issue"],
+    "deny": ["Bash(curl *)"],
+    "defaultMode": "bypassPermissions"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "env": {
+    "HTTPS_PROXY": "http://proxy.lan:8080",
+    "NODE_TLS_REJECT_UNAUTHORIZED": "0",
+    "MAX_THINKING_TOKENS": "16000"
+  },
+  "alwaysThinkingEnabled": true
+}

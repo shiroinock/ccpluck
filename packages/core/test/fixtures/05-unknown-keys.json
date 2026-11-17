@@ -1,0 +1,15 @@
+{
+  "model": "opus",
+  "someFutureSetting": { "nested": { "deep": [1, 2, 3] }, "flag": true },
+  "experimentalThing": "on",
+  "permissions": {
+    "allow": ["Read"],
+    "futurePermissionKey": ["x", "y"]
+  },
+  "hooks": {
+    "WeirdEvent": "not-an-array",
+    "PreToolUse": [{ "matcher": "Read", "hooks": [{ "type": "command", "command": "echo read" }] }]
+  },
+  "companyAnnouncements": ["Welcome!", "Remember to review PRs"],
+  "fallbackModel": ["opus", "sonnet"]
+}

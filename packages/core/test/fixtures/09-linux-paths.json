@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": ["Read(/home/jiro/src/**)", "Edit(/home/jiro/src/**)"],
+    "additionalDirectories": ["/home/jiro/notes", "/srv/shared"]
+  },
+  "plansDirectory": "/home/jiro/plans",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [{ "type": "command", "command": "python3 /home/jiro/.claude/hooks/inject_context.py", "timeout": 5 }]
+      }
+    ]
+  },
+  "statusLine": { "type": "command", "command": "bash $HOME/.claude/statusline.sh" }
+}

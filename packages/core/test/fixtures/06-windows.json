@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": ["Read(C:\\Users\\hanako\\projects\\**)", "PowerShell(Get-ChildItem *)"],
+    "additionalDirectories": ["C:\\Users\\hanako\\Documents\\shared", "D:/work/repo"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "PowerShell",
+        "hooks": [{ "type": "command", "command": "powershell -File C:\\Users\\hanako\\.claude\\hooks\\guard.ps1" }]
+      }
+    ]
+  },
+  "defaultShell": "powershell",
+  "statusLine": { "type": "command", "command": "node C:/Users/hanako/.claude/statusline.js" }
+}

@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "formatter@anthropic-tools": true,
+    "deploy-helper@example-internal": false
+  },
+  "extraKnownMarketplaces": {
+    "example-internal": { "source": { "source": "github", "repo": "example-org/claude-plugins" } }
+  },
+  "enabledMcpjsonServers": ["github", "postgres"],
+  "disabledMcpjsonServers": ["filesystem"],
+  "enableAllProjectMcpServers": false,
+  "sandbox": { "enabled": true, "autoAllowBashIfSandboxed": true, "excludedCommands": ["docker"] },
+  "attribution": { "commit": "", "pr": "" }
+}

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": ["Bash(npm run test *)", "Bash(git status)", "Read(~/notes/**)", "WebFetch(domain:docs.anthropic.com)"],
+    "deny": ["Bash(rm -rf *)", "Read(./.env)", "Read(./secrets/**)"],
+    "ask": ["Bash(git push *)"],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": ["../shared-lib"]
+  },
+  "model": "sonnet"
+}
