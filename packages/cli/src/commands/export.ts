@@ -4,12 +4,12 @@ import {
   createPost,
   isPlainObject,
   maskSettings,
+  remapNotes,
   validateNotes,
   decompose,
   type MaskFinding,
   type Notes,
   type PostMeta,
-  type Settings,
 } from "@ccpick/core";
 import { CliError, type Context } from "../context.js";
 import { readSettingsFile } from "../fsutil.js";
@@ -84,22 +84,6 @@ export async function runExport(ctx: Context, opts: ExportOptions): Promise<numb
     io.out(text);
   }
   return 0;
-}
-
-/**
- * マスクでパスやコマンドが書き換わると項目 ID も変わるので、注釈のキーを付け替える。
- * マスクは構造を保つため、分解した項目は同じ順序で 1 対 1 に対応する。
- */
-export function remapNotes(original: Settings, masked: Settings, notes: Notes): Notes {
-  const before = decompose(original).items;
-  const after = decompose(masked).items;
-  if (before.length !== after.length) {
-    // マスクで 2 つの項目が同じになった場合など。対応が取れないものは元の ID のまま残す
-    const ids = new Set(after.map((i) => i.id));
-    return Object.fromEntries(Object.entries(notes).filter(([id]) => ids.has(id)));
-  }
-  const map = new Map(before.map((b, i) => [b.id, after[i]!.id]));
-  return Object.fromEntries(Object.entries(notes).flatMap(([id, n]) => (map.has(id) ? [[map.get(id)!, n]] : [])));
 }
 
 function highlightMarkers(text: string, paint: (s: string) => string): string {

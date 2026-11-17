@@ -196,3 +196,21 @@ export function createPost(maskedSettings: Settings, notes: Notes, meta: PostMet
     meta: { license: DEFAULT_LICENSE, ...meta },
   };
 }
+
+/**
+ * マスク前後の項目を対応付ける。マスクは構造を保つので、分解した項目は同じ順序で 1 対 1 に対応する。
+ * マスクで 2 つの項目が同じになった（重複としてまとめられた）場合だけ、ID が一致するものに限って対応させる。
+ */
+export function maskedItemPairs(original: Settings, masked: Settings): { original: Item; masked: Item | undefined }[] {
+  const before = decompose(original).items;
+  const after = decompose(masked).items;
+  if (before.length === after.length) return before.map((b, i) => ({ original: b, masked: after[i] }));
+  const byId = new Map(after.map((a) => [a.id, a]));
+  return before.map((b) => ({ original: b, masked: byId.get(b.id) }));
+}
+
+/** 元の settings の項目 ID で書かれた注釈を、マスク後の項目 ID に付け替える */
+export function remapNotes(original: Settings, masked: Settings, notes: Notes): Notes {
+  const map = new Map(maskedItemPairs(original, masked).flatMap((p) => (p.masked ? [[p.original.id, p.masked.id]] : [])));
+  return Object.fromEntries(Object.entries(notes).flatMap(([id, n]) => (map.has(id) ? [[map.get(id)!, n]] : [])));
+}
