@@ -160,3 +160,130 @@ describe("export", () => {
     expect(post.meta).toEqual({ license: "CC0-1.0", tags: ["web"] });
   });
 });
+
+describe("timeline", async () => {
+  const { attentionOrder, attentionOf, timelineState } = await import("../src/model.js");
+  const m = buildModel(sample(), { mask: true, publicEnv: [] });
+
+  it("orders items by what needs attention first", () => {
+    const order = attentionOrder(m.rows);
+    const ranks = order.map((r) => attentionOf(r).rank);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    expect(attentionOf(order[0]!).reason).toBe("マスクした値を含みます");
+    expect(order[0]!.key).toBe("/env/GITHUB_TOKEN");
+    expect(attentionOf(order[order.length - 1]!).rank).toBe(4);
+    // 社内ホスト名を含む medium 項目は、ほかの medium より先に出る
+    const hint = order.findIndex((r) => r.key === '/permissions/allow/{"WebFetch(domain:wiki.example.internal)"}');
+    const med = order.findIndex((r) => r.key === '/permissions/allow/{"Bash(npm run test *)"}');
+    expect(hint).toBeLessThan(med);
+  });
+
+  it("walks through items, deferring to the end and allowing decisions from the list", () => {
+    const order = attentionOrder(m.rows);
+    const [a, b, c] = order.map((r) => r.key);
+    const sel = new Set<string>();
+    const rej = new Set<string>();
+
+    let s = timelineState(m.rows, sel, rej, [], []);
+    expect(s.current?.key).toBe(a);
+    expect(s.done).toEqual([]);
+
+    sel.add(a!);
+    s = timelineState(m.rows, sel, rej, [a!], [b!]);
+    expect(s.current?.key).toBe(c);
+    expect(s.deferred.map((r) => r.key)).toEqual([b]);
+    expect(s.done.map((d) => [d.row.key, d.decision])).toEqual([[a, "in"]]);
+
+    // 一覧で決めた項目も済みに入る
+    rej.add(c!);
+    s = timelineState(m.rows, sel, rej, [a!], [b!]);
+    expect(s.done.map((d) => d.row.key)).toEqual([c, a]);
+
+    // 残りを全部決めると、あとで回しが最後に出てくる
+    for (const r of order) if (r.key !== b && !sel.has(r.key) && !rej.has(r.key)) rej.add(r.key);
+    s = timelineState(m.rows, sel, rej, [a!], [b!]);
+    expect(s.current?.key).toBe(b);
+    expect(s.deferred).toEqual([]);
+    expect(s.upcoming).toEqual([]);
+
+    rej.add(b!);
+    s = timelineState(m.rows, sel, rej, [a!, b!], []);
+    expect(s.current).toBeUndefined();
+    expect(s.done).toHaveLength(m.rows.length);
+  });
+});
+
+describe("pick (他人の設定からもらう)", async () => {
+  const { parseSource, compareWithMine, timelineState, attentionOrder, pickAttentionOf } = await import("../src/model.js");
+  const { decompose } = await import("@ccpick/core");
+
+  const POST = JSON.stringify({
+    format: "ccpick-post",
+    version: 1,
+    settings: {
+      model: "opus",
+      cleanupPeriodDays: 7,
+      permissions: { allow: ["Bash(npm run test *)", "Bash(git status)"], deny: ["Bash(rm -rf *)"] },
+      env: { GITHUB_TOKEN: "<<MASKED:env.GITHUB_TOKEN>>" },
+    },
+    notes: {
+      '/permissions/deny/{"Bash(rm -rf *)"}': { why: "誤爆防止" },
+      "/model": { why: "精度優先" },
+      "/__proto__": { why: "x" },
+    },
+    meta: { title: "Web 開発用", tags: ["web"], os: "macos", license: "CC0-1.0" },
+  });
+  const MINE = { model: "sonnet", permissions: { allow: ["Bash(git status)"] } };
+
+  it("reads a post with its notes and meta, and plain settings too", () => {
+    const r = parseSource(POST);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.source.isPost).toBe(true);
+    expect(r.source.meta).toEqual({ title: "Web 開発用", tags: ["web"], os: "macos", license: "CC0-1.0" });
+    expect(r.source.notes["/model"]).toEqual({ why: "精度優先" });
+    expect(({} as Record<string, unknown>).why).toBeUndefined();
+    const plain = parseSource('{"model":"opus"}');
+    expect(plain.ok && plain.source.isPost).toBe(false);
+    expect(parseSource("{oops").ok).toBe(false);
+  });
+
+  it("compares each item with my settings", () => {
+    const items = decompose({ model: "opus", cleanupPeriodDays: 7, permissions: { allow: ["Bash(git status)"] } }).items;
+    expect(items.map((i) => compareWithMine(i, MINE).kind)).toEqual(["differs", "new", "same"]);
+  });
+
+  it("shows new items with the author's reason first and skips what I already have", () => {
+    const r = parseSource(POST);
+    if (!r.ok) throw new Error();
+    const m = buildModel(r.source.settings, { mask: false, publicEnv: [], mine: MINE, authorNotes: r.source.notes });
+    const order = attentionOrder(m.rows, "pick").map((x) => x.key);
+    expect(order[0]).toBe('/permissions/deny/{"Bash(rm -rf *)"}');
+    expect(pickAttentionOf(m.rows.find((x) => x.key === "/model")!).reason).toBe("あなたの設定と値が違います");
+    const t = timelineState(m.rows, new Set(), new Set(), [], [], "pick");
+    expect(t.already.map((x) => x.key)).toEqual(['/permissions/allow/{"Bash(git status)"}']);
+    expect(t.total).toBe(m.rows.length - 1);
+    expect(t.current?.authorWhy).toBe("誤爆防止");
+  });
+
+  it("works without my settings (no comparison)", () => {
+    const r = parseSource(POST);
+    if (!r.ok) throw new Error();
+    const m = buildModel(r.source.settings, { mask: false, publicEnv: [], authorNotes: r.source.notes });
+    expect(m.rows.every((x) => x.mine === undefined)).toBe(true);
+    const t = timelineState(m.rows, new Set(), new Set(), [], [], "pick");
+    expect(t.already).toEqual([]);
+    expect(t.current?.authorWhy).toBeDefined();
+  });
+});
+
+describe("sample post", () => {
+  it("every note in the sample post points at a real item", async () => {
+    const { parseSource } = await import("../src/model.js");
+    const { SAMPLE_POST } = await import("../src/sample.js");
+    const r = parseSource(SAMPLE_POST);
+    if (!r.ok) throw new Error(r.error);
+    const m = buildModel(r.source.settings, { mask: false, publicEnv: [], authorNotes: r.source.notes });
+    expect(m.rows.filter((x) => x.authorWhy)).toHaveLength(Object.keys(r.source.notes).length);
+  });
+});

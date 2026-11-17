@@ -11,6 +11,9 @@ import {
   createBundle,
   createPost,
   decompose,
+  deepEqual,
+  getItemValue,
+  POST_FORMAT,
   describeItem,
   isPlainObject,
   itemDependencies,
@@ -28,8 +31,12 @@ import {
   type RiskLevel,
   type Settings,
   type SharePost,
+  type JsonValue,
   type Warning,
 } from "@ccpick/core";
+
+/** 画面の目的。もらう＝他人の設定から取り込む／公開する＝自分の設定を投稿する */
+export type Purpose = "pick" | "publish";
 
 // ---------------------------------------------------------------------------
 // 入力
@@ -60,6 +67,56 @@ export function parseInput(text: string): ParseResult {
   return { ok: true, settings: value, warnings: v.warnings };
 }
 
+/** 他人の投稿として読み込んだもの */
+export interface Source {
+  settings: Settings;
+  /** 作者の注釈（項目 ID → 理由） */
+  notes: Notes;
+  meta?: PostMeta;
+  /** ccpick の投稿形式だったか（素の settings.json なら false） */
+  isPost: boolean;
+  warnings: Warning[];
+}
+
+/**
+ * 「もらう」側の入力。ccpick の投稿（export --mask や公開画面の出力）と、素の settings.json のどちらも受け付ける。
+ */
+export function parseSource(text: string): { ok: true; source: Source } | { ok: false; error: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    const r = parseInput(text);
+    return r.ok ? { ok: false, error: "読めません" } : { ok: false, error: r.error };
+  }
+  if (isPlainObject(raw) && raw.format === POST_FORMAT) {
+    const r = parseInput(JSON.stringify(raw.settings ?? null));
+    if (!r.ok) return { ok: false, error: `投稿の settings が不正です: ${r.error}` };
+    const notes: Notes = {};
+    if (isPlainObject(raw.notes)) {
+      for (const [id, n] of Object.entries(raw.notes)) {
+        if (isPlainObject(n) && typeof n.why === "string") {
+          Object.defineProperty(notes, id, { value: { why: n.why }, enumerable: true, writable: true, configurable: true });
+        }
+      }
+    }
+    const source: Source = { settings: r.settings, notes, isPost: true, warnings: r.warnings };
+    if (isPlainObject(raw.meta)) {
+      const m = raw.meta;
+      const meta: PostMeta = {};
+      if (typeof m.title === "string") meta.title = m.title;
+      if (typeof m.os === "string") meta.os = m.os as PostMeta["os"];
+      if (Array.isArray(m.tags)) meta.tags = m.tags.filter((t): t is string => typeof t === "string");
+      if (typeof m.license === "string") meta.license = m.license;
+      source.meta = meta;
+    }
+    return { ok: true, source };
+  }
+  const r = parseInput(text);
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, source: { settings: r.settings, notes: {}, isPost: false, warnings: r.warnings } };
+}
+
 // ---------------------------------------------------------------------------
 // 項目の一覧
 
@@ -67,6 +124,24 @@ export interface Options {
   mask: boolean;
   /** 値を公開してよい env のキー */
   publicEnv: string[];
+  /** 比べる相手（もらう側の、自分の settings.json） */
+  mine?: Settings;
+  /** 作者の注釈 */
+  authorNotes?: Notes;
+}
+
+/** 自分の settings.json と比べた結果 */
+export type MineStatus =
+  | { kind: "new" }
+  | { kind: "same" }
+  | { kind: "differs"; value: JsonValue };
+
+export function compareWithMine(item: Item, mine: Settings): MineStatus {
+  const v = getItemValue(mine, item.id);
+  if (v === undefined) return { kind: "new" };
+  // 配列要素と hook は「同じものがある」＝取り込んでも変わらない（hook は同じコマンドなら重複扱い）
+  if (item.kind === "array-element" || item.kind === "hook" || deepEqual(v, item.value)) return { kind: "same" };
+  return { kind: "differs", value: v };
 }
 
 export interface Row {
@@ -83,6 +158,10 @@ export interface Row {
   /** マスクで変わった */
   changedByMask: boolean;
   deps: Dependency[];
+  /** 自分の settings.json と比べた結果（比べる相手がないときは undefined） */
+  mine?: MineStatus;
+  /** 作者が書いた「なぜ」 */
+  authorWhy?: string;
 }
 
 export interface Model {
@@ -120,6 +199,9 @@ export function buildModel(settings: Settings, opts: Options): Model {
     };
     const desc = describeItem(original);
     if (desc) row.description = desc;
+    if (opts.mine) row.mine = compareWithMine(masked, opts.mine);
+    const why = opts.authorNotes?.[original.id]?.why?.trim();
+    if (why) row.authorWhy = why;
     rows.push(row);
   }
   return { rows, findings, envKeys, warnings: d.warnings };
@@ -291,4 +373,111 @@ export function toJsonText(v: unknown): string {
 /** 選択の一括操作 */
 export function selectWhere(rows: Row[], pred: (r: Row) => boolean): Set<string> {
   return new Set(rows.filter(pred).map((r) => r.key));
+}
+
+// ---------------------------------------------------------------------------
+// タイムライン（システムが「次に見るもの」を決めて 1 件ずつ出す）
+
+export type Decision = "in" | "out";
+
+export interface Attention {
+  /** 小さいほど先に出す */
+  rank: number;
+  /** なぜこの順番で出しているか（カードに表示する） */
+  reason: string;
+}
+
+/**
+ * 先に見てほしい順。公開して困るもの・取り込むと危ないものを先に出す。
+ * 1. マスク値を含む（公開してよいか、取り込む側で値が要るか）
+ * 2. high リスク
+ * 3. 社内ホスト名などを含む
+ * 4. medium
+ * 5. low
+ */
+export function attentionOf(row: Row): Attention {
+  if (row.hasMasked) return { rank: 0, reason: "マスクした値を含みます" };
+  if (row.risk.level === "high") return { rank: 1, reason: "high リスクです" };
+  if (hintCount(row) > 0) return { rank: 2, reason: "社内のホスト名などを含みます" };
+  if (row.risk.level === "medium") return { rank: 3, reason: "medium リスクです" };
+  return { rank: 4, reason: "low リスクです" };
+}
+
+/**
+ * もらう側の順。自分に足りないもの・作者が理由を書いているものを先に出す。
+ * 同じ設定をすでに持っている項目は出さない（rank 9）。
+ */
+export function pickAttentionOf(row: Row): Attention {
+  const m = row.mine?.kind;
+  if (m === "same") return { rank: 9, reason: "同じ設定をすでに持っています" };
+  if (m === "differs") return { rank: 3, reason: "あなたの設定と値が違います" };
+  if (row.authorWhy) return { rank: 0, reason: m === "new" ? "あなたの設定になく、作者が理由を書いています" : "作者が理由を書いています" };
+  if (m === "new") return { rank: 1, reason: "あなたの設定にない項目です" };
+  return { rank: 2, reason: "この投稿の項目です" };
+}
+
+export function attentionFor(purpose: Purpose, row: Row): Attention {
+  return purpose === "pick" ? pickAttentionOf(row) : attentionOf(row);
+}
+
+/** 注意の順に並べる（同じ順位の中では settings.json に書かれた順） */
+export function attentionOrder(rows: Row[], purpose: Purpose = "publish"): Row[] {
+  return rows
+    .map((r, i) => ({ r, i, a: attentionFor(purpose, r).rank }))
+    .sort((x, y) => x.a - y.a || x.i - y.i)
+    .map((x) => x.r);
+}
+
+export interface TimelineState {
+  /** 決めた順（log の順） */
+  done: { row: Row; decision: Decision }[];
+  /** いま見ている項目。すべて決め終えたら undefined */
+  current: Row | undefined;
+  /** これから出る項目（あとで回しを除く） */
+  upcoming: Row[];
+  /** あとで回しにした未決の項目。upcoming が尽きたら順に current になる */
+  deferred: Row[];
+  /** 同じ設定をすでに持っているので出さない項目（もらう側のみ） */
+  already: Row[];
+  total: number;
+}
+
+/**
+ * タイムラインの状態を組み立てる。
+ * @param log 決めた順の項目キー（選択／除外のどちらかに入っているもの）
+ * @param deferred あとで回しにした順の項目キー
+ */
+export function timelineState(
+  rows: Row[],
+  selected: Set<string>,
+  rejected: Set<string>,
+  log: string[],
+  deferred: string[],
+  purpose: Purpose = "publish",
+): TimelineState {
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  const decision = (k: string): Decision | undefined => (selected.has(k) ? "in" : rejected.has(k) ? "out" : undefined);
+  const logged = log.filter((k, i) => byKey.has(k) && decision(k) && log.indexOf(k) === i);
+  // 一覧で決めた項目など、log にないものも「済み」に含める
+  const extra = rows.filter((r) => decision(r.key) && !logged.includes(r.key)).map((r) => r.key);
+  const doneKeys = [...extra, ...logged];
+  const done = doneKeys.map((k) => ({ row: byKey.get(k)!, decision: decision(k)! }));
+  const isAlready = (r: Row) => purpose === "pick" && r.mine?.kind === "same";
+  const already = rows.filter((r) => isAlready(r) && !decision(r.key));
+  const pending = attentionOrder(rows, purpose).filter((r) => !decision(r.key) && !isAlready(r));
+  const deferredSet = new Set(deferred);
+  const fresh = pending.filter((r) => !deferredSet.has(r.key));
+  const later = deferred.flatMap((k) => {
+    const r = byKey.get(k);
+    return r && !decision(k) ? [r] : [];
+  });
+  const queue = [...fresh, ...later];
+  return {
+    done,
+    current: queue[0],
+    upcoming: fresh.slice(1),
+    deferred: fresh.length > 0 ? later : later.slice(1),
+    already,
+    total: rows.length - already.length,
+  };
 }

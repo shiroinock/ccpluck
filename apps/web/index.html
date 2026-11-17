@@ -14,21 +14,23 @@
   <body>
     <header class="masthead">
       <h1 class="wordmark">ccpick</h1>
-      <p class="tagline">settings.json から必要な項目だけを選んで持ち出す</p>
+      <nav class="purpose" role="tablist" aria-label="やること">
+        <button id="purpose-pick" class="purpose-tab" role="tab" type="button" aria-selected="true">
+          <span class="purpose-name">もらう</span>
+          <span class="purpose-desc">誰かの設定から、欲しいキーだけ自分の settings.json へ</span>
+        </button>
+        <button id="purpose-publish" class="purpose-tab" role="tab" type="button" aria-selected="false">
+          <span class="purpose-name">公開する</span>
+          <span class="purpose-desc">自分の設定をマスクし、理由を添えて共有する</span>
+        </button>
+      </nav>
       <p class="privacy">貼り付けた内容はこのページの中だけで処理され、どこにも送信されません。</p>
     </header>
 
     <main class="layout">
-      <section class="source" aria-labelledby="source-title">
-        <h2 id="source-title" class="panel-title">settings.json</h2>
-        <label class="sr-only" for="input">settings.json の中身</label>
-        <textarea
-          id="input"
-          class="input"
-          spellcheck="false"
-          autocomplete="off"
-          placeholder="~/.claude/settings.json の中身を貼り付けるか、ファイルをここにドロップしてください"
-        ></textarea>
+      <section class="source" aria-label="入力">
+        <h2 id="input-title" class="panel-title">もらう設定</h2>
+        <textarea id="input" class="input" spellcheck="false" autocomplete="off" aria-labelledby="input-title"></textarea>
         <div class="source-actions">
           <label class="button button-quiet file-button">
             ファイルを開く
@@ -39,52 +41,77 @@
         </div>
         <p id="input-status" class="input-status" role="status" aria-live="polite"></p>
 
-        <fieldset class="mask-options" id="mask-options">
+        <section id="mine-panel" class="side-section" aria-labelledby="mine-title">
+          <h2 id="mine-title" class="panel-title">自分の settings.json と比べる（任意）</h2>
+          <p class="hint-text">
+            貼り付けると、もう持っている設定は飛ばし、値が違う項目にはあなたの今の値を並べて見せます。比べるためだけに使い、書き出すファイルには入りません。
+          </p>
+          <textarea
+            id="mine"
+            class="input input-small"
+            spellcheck="false"
+            autocomplete="off"
+            aria-labelledby="mine-title"
+            placeholder="~/.claude/settings.json の中身"
+          ></textarea>
+          <p id="mine-status" class="input-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <fieldset class="side-section mask-options" id="mask-options" hidden>
           <legend class="panel-title">公開前のマスク</legend>
           <label class="check">
-            <input id="mask" type="checkbox" checked />
+            <input id="mask" type="checkbox" checked disabled />
             <span>秘密になりうる値をマスクする</span>
           </label>
           <p class="hint-text">
             env の値、トークン、URL 内の認証情報、ランダムな文字列を <code>&lt;&lt;MASKED:…&gt;&gt;</code>
-            に置き換え、ホームディレクトリのパスを <code>~</code> にします。他人の設定から取り込むだけならオフにしても構いません。
+            に置き換え、ホームディレクトリのパスを <code>~</code> にします。公開するときは外せません。
           </p>
           <div id="env-public" class="env-public"></div>
           <div id="findings" class="findings"></div>
         </fieldset>
       </section>
 
-      <section class="manifest" aria-labelledby="manifest-title">
+      <section class="manifest" aria-label="項目">
+        <div id="post-header" class="post-header" hidden></div>
         <div class="manifest-head">
-          <h2 id="manifest-title" class="panel-title">項目</h2>
-          <div class="toolbar" role="group" aria-label="絞り込み">
-            <div class="segmented" role="radiogroup" aria-label="リスク">
-              <label><input type="radio" name="risk" value="all" checked /><span>すべて</span></label>
-              <label><input type="radio" name="risk" value="high" /><span>high</span></label>
-              <label><input type="radio" name="risk" value="medium" /><span>medium</span></label>
-              <label><input type="radio" name="risk" value="low" /><span>low</span></label>
+          <div class="view-switch" role="tablist" aria-label="表示">
+            <button id="view-timeline" class="view-tab" role="tab" type="button" aria-selected="true" aria-controls="timeline">
+              順に見る
+            </button>
+            <button id="view-list" class="view-tab" role="tab" type="button" aria-selected="false" aria-controls="rows">
+              一覧から選ぶ
+            </button>
+          </div>
+          <p id="view-hint" class="view-hint"></p>
+          <div id="list-controls" hidden>
+            <div class="toolbar" role="group" aria-label="絞り込み">
+              <div class="segmented" role="radiogroup" aria-label="リスク">
+                <label><input type="radio" name="risk" value="all" checked /><span>すべて</span></label>
+                <label><input type="radio" name="risk" value="high" /><span>high</span></label>
+                <label><input type="radio" name="risk" value="medium" /><span>medium</span></label>
+                <label><input type="radio" name="risk" value="low" /><span>low</span></label>
+              </div>
+              <label class="sr-only" for="query">項目を検索</label>
+              <input id="query" class="search" type="search" placeholder="項目を検索" />
+              <label class="check small"><input id="only-selected" type="checkbox" /><span>選んだものだけ</span></label>
             </div>
-            <label class="sr-only" for="query">項目を検索</label>
-            <input id="query" class="search" type="search" placeholder="項目を検索" />
-            <label class="check small"><input id="only-selected" type="checkbox" /><span>選択中だけ</span></label>
-          </div>
-          <div class="bulk" role="group" aria-label="まとめて選択">
-            <button class="link" type="button" data-bulk="low">low をすべて選択</button>
-            <button class="link" type="button" data-bulk="visible">表示中をすべて選択</button>
-            <button class="link" type="button" data-bulk="none">選択を解除</button>
+            <div class="bulk" role="group" aria-label="まとめて選択">
+              <button class="link" type="button" data-bulk="low">low をすべて選ぶ</button>
+              <button class="link" type="button" data-bulk="visible">表示中をすべて選ぶ</button>
+              <button class="link" type="button" data-bulk="none">選択を解除</button>
+            </div>
           </div>
         </div>
-        <div id="rows" class="rows">
-          <p class="empty">左に settings.json を貼り付けると、ここに項目が並びます。</p>
-        </div>
+        <div id="timeline" class="timeline" role="tabpanel" aria-labelledby="view-timeline"></div>
+        <div id="rows" class="rows" role="tabpanel" aria-labelledby="view-list" hidden></div>
       </section>
     </main>
 
     <footer class="dock" id="dock">
-      <p id="summary" class="summary" aria-live="polite">項目を選んでください</p>
+      <p id="summary" class="summary" aria-live="polite"></p>
       <div class="dock-actions">
-        <button id="open-bundle" class="button button-primary" type="button" disabled>取り込み用に書き出す</button>
-        <button id="open-post" class="button" type="button" disabled>投稿用に書き出す</button>
+        <button id="open-output" class="button button-primary" type="button" disabled></button>
       </div>
     </footer>
 
@@ -92,10 +119,10 @@
       <form method="dialog" class="output-inner">
         <header class="output-head">
           <h2 id="output-title" class="panel-title"></h2>
-          <button class="button button-quiet" value="close" aria-label="閉じる">閉じる</button>
+          <button class="button button-quiet" value="close">閉じる</button>
         </header>
         <div id="output-meta" class="output-meta"></div>
-        <p id="output-note" class="output-note"></p>
+        <div id="output-note" class="output-note"></div>
         <pre id="output-json" class="output-json" tabindex="0"></pre>
         <div class="output-actions">
           <button id="download" class="button button-primary" type="button">保存する</button>
