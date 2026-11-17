@@ -10,14 +10,14 @@ import {
 } from "../src/index.js";
 import { fixtures, loadFixture } from "./helpers.js";
 
-/** フィクスチャに埋め込んだ「秘密」。マスク後の出力に 1 つも残ってはいけない */
+/** フィクスチャに埋め込んだ架空の「秘密」（形だけ本物に似せた FAKE 値）。マスク後の出力に 1 つも残ってはいけない */
 const KNOWN_SECRETS = [
-  "ghp_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5",
-  "sk-ant-api03-Zx9Yw8Vu7Ts6Rq5Po4Nm3Lk2Jj1Hh0Gg",
-  "s3cr3tPassw0rd",
-  "AKIAIOSFODNN7EXAMPLE",
-  "9fQ2xL7pR4mZ8wK3vN6bT1yH5cJ0dS",
-  "XXXXXXXX", // SLACK_WEBHOOK（env なので丸ごとマスク）
+  "ghp_FAKEdummyTOKENforTESTSonly0000000000",
+  "sk-ant-FAKE-dummy-key-for-tests-only",
+  "FAKE-password",
+  "AKIAFAKEFAKEFAKEFAKE",
+  "FAKE9fQ2xL7pR4mZ8wK3vN6bT1yH5c",
+  "FAKEWEBHOOK", // SLACK_WEBHOOK（env なので丸ごとマスク）
 ];
 
 const USERNAMES = ["/Users/taro", "/home/jiro", "C:\\Users\\hanako", "C:/Users/hanako"];
@@ -85,7 +85,7 @@ describe("maskSettings", () => {
     const out = maskSettings({
       permissions: { allow: ["Bash(npm run test *)", "Read(~/projects/my-app/src/**)"] },
       model: "claude-opus-5-5",
-      unknownThing: "q8Zr2Lm9Xc4Vb7Nn1Kk5Tt3Yy6Hh0Ppw",
+      unknownThing: "FAKEq8Zr2Lm9Xc4Vb7Nn1Kk5Tt3Yy6H",
     }).settings as any;
     expect(out.permissions.allow).toEqual(["Bash(npm run test *)", "Read(~/projects/my-app/src/**)"]);
     expect(out.model).toBe("claude-opus-5-5");

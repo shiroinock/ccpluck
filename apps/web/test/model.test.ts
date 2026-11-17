@@ -14,7 +14,7 @@ import {
 } from "../src/model.js";
 import { SAMPLE } from "../src/sample.js";
 
-const SECRETS = ["ghp_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5", "sk-ant-api03-Zx9Yw8Vu7Ts6Rq5Po4Nm3Lk2Jj1Hh0Gg", "taro"];
+const SECRETS = ["ghp_FAKEdummyTOKENforTESTSonly0000000000", "sk-ant-FAKE-dummy-key-for-tests-only", "taro"];
 
 function sample() {
   const p = parseInput(SAMPLE);
