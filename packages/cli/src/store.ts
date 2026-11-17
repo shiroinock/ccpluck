@@ -14,7 +14,16 @@ export interface ImportRecord {
   id: string;
   createdAt: string;
   settingsPath: string;
-  source: { input: string; title?: string; url?: string; author?: string };
+  source: {
+    input: string;
+    title?: string;
+    url?: string;
+    author?: string;
+    /** 置き場所の投稿（`team:kenta/python`） */
+    post?: string;
+    /** 投稿の版（GitHub ではコミット ID） */
+    version?: string;
+  };
   /** 適用前のファイルの中身。ファイルがなかった場合は null */
   beforeText: string | null;
   /** 適用直後のファイルの sha256。undo でバイト一致の復元ができるかの判定に使う */

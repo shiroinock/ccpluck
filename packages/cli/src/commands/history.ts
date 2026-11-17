@@ -25,6 +25,7 @@ export async function runHistory(ctx: Context, opts: Common & { id?: string; jso
     }
     io.out(`${s.bold(rec.id)}  ${rec.createdAt}  ${statusLabel(rec)}`);
     io.out(`  取り込み元: ${rec.source.title ?? rec.source.input}`);
+    if (rec.source.post) io.out(`  投稿: ${rec.source.post}${rec.source.version ? `（版 ${rec.source.version.slice(0, 7)}）` : ""}`);
     io.out(`  対象: ${rec.settingsPath}`);
     for (const op of rec.ops) {
       const done = rec.reverted.includes(op.itemId) ? s.dim(" (revert 済み)") : "";
@@ -48,7 +49,7 @@ export async function runHistory(ctx: Context, opts: Common & { id?: string; jso
     const adds = r.ops.filter((o) => o.op === "add").length;
     const reps = r.ops.length - adds;
     io.out(
-      `${s.bold(r.id)}  ${r.createdAt.slice(0, 19).replace("T", " ")}  ${statusLabel(r).padEnd(10)}  +${adds} ~${reps}  ${r.source.title ?? r.source.input}`,
+      `${s.bold(r.id)}  ${r.createdAt.slice(0, 19).replace("T", " ")}  ${statusLabel(r).padEnd(10)}  +${adds} ~${reps}  ${r.source.title ?? r.source.input}${r.source.version ? s.dim(` @${r.source.version.slice(0, 7)}`) : ""}`,
     );
   }
   return 0;

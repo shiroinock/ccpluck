@@ -17,11 +17,15 @@ import {
   type PickState,
   type PostMeta,
   type PublishCandidate,
+  verifyMasked,
 } from "@ccpluck/core";
 import { CliError, type Context } from "../context.js";
 import { atomicWrite, exists, readSettingsFile } from "../fsutil.js";
 import { PublishMemoryStore, valueHash, type PublishMemory } from "../pick-memory.js";
 import { indent, makeStyle, riskBadge, type Style } from "../render.js";
+import { formatRef, NAME_RE, parseRef, type Backend, type Identity, type PostWithBody, type SubmitResult } from "../backend.js";
+import { shortVersion, syncQuietly } from "../post-input.js";
+import { RemoteStore, requireBackend } from "../remotes.js";
 import { loadJsonInput } from "./apply.js";
 import { highlightMarkers, osFromPlatform } from "./export.js";
 
@@ -39,7 +43,16 @@ export interface PublishOptions {
   tags: string[];
   /** 最後の確認を省略する */
   yes: boolean;
+  /** 置き場所に出す（GitHub では PR を作る） */
+  to?: string;
+  /** 置き場所での投稿の名前（posts/<ログイン名>/<名前>.json） */
+  name?: string;
 }
+
+/** 書き出し先。ファイルか置き場所か */
+type Target =
+  | { kind: "file"; outPath: string; memKey: string }
+  | { kind: "remote"; backend: Backend; identity: Identity; name: string; memKey: string; existing: PostWithBody | undefined };
 
 const OS_LIST = ["macos", "linux", "windows", "wsl", "other"];
 
@@ -58,19 +71,24 @@ export async function runPublish(ctx: Context, opts: PublishOptions): Promise<nu
   const file = await readSettingsFile(opts.settingsPath);
   if (file.text === null) throw new CliError(`${opts.settingsPath} がありません`);
 
-  // 1. 前回の投稿と決定を読む
-  const updatePath = opts.update ? resolve(ctx.cwd, opts.update) : undefined;
-  const outPath = resolve(ctx.cwd, opts.output ?? opts.update ?? "ccpluck-post.json");
-  const prev = updatePath ? parsePickSource(await loadJsonInput(ctx, updatePath, "前回の投稿")) : undefined;
+  // 1. 書き出し先と、前回の投稿・決定を読む
+  const target = await resolveTarget(ctx, opts, s);
+  const updatePath = target.kind === "remote" ? (target.existing ? target.memKey : undefined) : opts.update ? resolve(ctx.cwd, opts.update) : undefined;
+  const prevRaw =
+    target.kind === "remote" ? target.existing?.raw : updatePath ? await loadJsonInput(ctx, updatePath, "前回の投稿") : undefined;
+  const prev = prevRaw !== undefined ? parsePickSource(prevRaw) : undefined;
   if (prev && (prev.kind !== "post" || prev.errors.length > 0)) {
     throw new CliError(`${updatePath} は ccpluck の投稿ではありません${prev.errors.length > 0 ? `: ${prev.errors.join(", ")}` : ""}`);
   }
   const memStore = new PublishMemoryStore(opts.dataDir);
-  const memory = updatePath ? await memStore.load(updatePath) : undefined;
+  // 置き場所では、公開前（レビュー待ち）の出し直しでも前回の決定を引き継ぐ
+  const memory =
+    target.kind === "remote" ? await memStore.load(target.memKey) : updatePath ? await memStore.load(updatePath) : undefined;
   const publicEnv = new Set([...opts.publicEnv, ...(memory?.publicEnv ?? [])]);
 
   const whys: Whys = new Map();
   for (const [id, n] of Object.entries(prev?.notes ?? {})) if (n.why?.trim()) whys.set(id, n.why.trim());
+  for (const [id, w] of Object.entries(memory?.whys ?? {})) if (!whys.has(id) && typeof w === "string" && w.trim()) whys.set(id, w.trim());
 
   let plan = publishCandidates(file.settings, { publicEnvKeys: [...publicEnv] });
   // env の公開を切り替えるとマスクが変わって順位も変わるが、いま見ているカードが入れ替わらないよう最初の順を保つ
@@ -98,6 +116,9 @@ export async function runPublish(ctx: Context, opts: PublishOptions): Promise<nu
   const shown = () => plan.candidates.filter((c) => !isCarried(c));
 
   printHeader(ctx, s, { opts, plan, prev, updatePath, carriedCount: plan.candidates.length - shown().length, whys });
+  if (!prev && memory && plan.candidates.length > shown().length) {
+    io.err(`前回出した内容（${target.memKey}）から：決めた ${plan.candidates.length - shown().length} 件を引き継ぎます（理由 ${whys.size} 件）`);
+  }
 
   // 2. 1 件ずつ決める
   const ask = io.key ? io.key.bind(io) : async (q: string, keys: string[]) => {
@@ -203,19 +224,39 @@ export async function runPublish(ctx: Context, opts: PublishOptions): Promise<nu
     io.err(s.yellow(`\n確認してほしい箇所が残っています（マスクしていません）:`));
     for (const h of hints) io.err(`  ${s.yellow(h.match)}  ${s.dim(h.reason)}`);
   }
-  const already = await exists(outPath);
+  // 送る直前にもう一度マスク漏れを確かめる（一度 push すると消せないため）
+  const leftovers = verifyMasked(post.settings, { publicEnvKeys: [...publicEnv] });
+  if (leftovers.length > 0) {
+    throw new CliError(`マスクされていない値が残っています。何も送っていません:\n  ${leftovers.map((f) => f.path).join("\n  ")}`);
+  }
+  const where =
+    target.kind === "file"
+      ? `${target.outPath} に${(await exists(target.outPath)) ? "上書きして" : ""}書き出しますか?`
+      : `${target.backend.name}（${target.backend.label}）に ${target.identity.login}/${target.name} として${target.existing ? "更新を" : ""}出しますか? レビューを経て公開されます`;
   if (!opts.yes) {
-    const a = (await io.ask(`\n${outPath} に${already ? "上書きして" : ""}書き出しますか? [Y/n] `)).trim().toLowerCase();
+    const a = (await io.ask(`\n${where} [Y/n] `)).trim().toLowerCase();
     if (a !== "" && a !== "y" && a !== "yes") {
-      io.err("中止しました（何も書き出していません）");
+      io.err("中止しました（何も送っていません）");
       return 1;
     }
   }
-  await atomicWrite(outPath, text);
+  let submitted: SubmitResult | undefined;
+  if (target.kind === "file") await atomicWrite(target.outPath, text);
+  else {
+    submitted = await target.backend.submit({
+      author: target.identity.login,
+      name: target.name,
+      text,
+      update: Boolean(target.existing),
+      title: meta.title ?? "",
+      identity: target.identity,
+    });
+  }
 
   // 6. 次の --update のために決定を覚える
   const now = ctx.now().toISOString();
-  const mem: PublishMemory = { version: 1, outputPath: outPath, updatedAt: now, publicEnv: [...publicEnv].sort(), decisions: {} };
+  const mem: PublishMemory = { version: 1, outputPath: target.memKey, updatedAt: now, publicEnv: [...publicEnv].sort(), decisions: {}, whys: {} };
+  for (const [id, w] of whys) Object.defineProperty(mem.whys, id, { value: w, enumerable: true, writable: true, configurable: true });
   for (const c of plan.candidates) {
     const d = state.decisions[c.item.id];
     if (!d) continue;
@@ -228,10 +269,54 @@ export async function runPublish(ctx: Context, opts: PublishOptions): Promise<nu
   }
   await memStore.save(mem);
 
-  io.err(s.green(`\n書き出しました: ${outPath}`));
-  io.err(s.dim(`もらう人は ccpluck pick ${outPath} で、欲しい項目だけを取り込めます`));
-  io.err(s.dim(`設定を変えたら ccpluck publish --update ${outPath} で、変わったところだけ聞きます`));
+  if (target.kind === "file") {
+    io.err(s.green(`\n書き出しました: ${target.outPath}`));
+    io.err(s.dim(`もらう人は ccpluck pick ${target.outPath} で、欲しい項目だけを取り込めます`));
+    io.err(s.dim(`設定を変えたら ccpluck publish --update ${target.outPath} で、変わったところだけ聞きます`));
+    return 0;
+  }
+  const ref = target.memKey;
+  if (submitted?.unchanged) {
+    io.err(s.green(`\n公開済みの ${ref} と同じ内容です。送るものはありません`));
+    return 0;
+  }
+  io.err(s.green(`\n${submitted?.created ? "レビュー待ちです" : "レビュー待ちの PR を更新しました"}: ${submitted?.url ?? ""}`));
+  io.err(s.dim(`マージされると、ccpluck pick ${ref} で取り込めるようになります`));
+  io.err(s.dim(`設定を変えたら ccpluck publish --update ${ref} で、変わったところだけ聞きます`));
   return 0;
+}
+
+const NAME_HINT = "英数字・ハイフン・ドット・アンダースコアで 100 文字まで";
+
+async function resolveTarget(ctx: Context, opts: PublishOptions, s: Style): Promise<Target> {
+  const ref = opts.update ? parseRef(opts.update) : undefined;
+  const remoteName = ref && (await new RemoteStore(opts.dataDir).get(ref.remote)) ? ref.remote : opts.to;
+  if (!remoteName) {
+    if (opts.name) throw new CliError("--name は --to と一緒に使います");
+    const outPath = resolve(ctx.cwd, opts.output ?? opts.update ?? "ccpluck-post.json");
+    return { kind: "file", outPath, memKey: outPath };
+  }
+  if (opts.output) throw new CliError("-o/--output は置き場所に出すときには使えません");
+  if (opts.to && ref && opts.to !== ref.remote) throw new CliError(`--to ${opts.to} と --update ${opts.update} の置き場所が違います`);
+  const backend = await requireBackend(ctx, opts.dataDir, remoteName);
+  await syncQuietly(ctx, backend, s);
+  const identity = await backend.whoami();
+  if (ref && ref.author !== identity.login) {
+    throw new CliError(`${opts.update} は ${ref.author} さんの投稿です。更新できるのは自分（${identity.login}）の投稿だけです`);
+  }
+  let name = ref?.name ?? opts.name;
+  if (opts.name && ref && opts.name !== ref.name) throw new CliError("--name と --update の投稿の名前が違います");
+  while (!name) {
+    const a = (await ctx.io.ask(`投稿の名前（${NAME_HINT}。例: python）: `)).trim();
+    if (NAME_RE.test(a)) name = a;
+    else if (a) ctx.io.err(s.yellow(`  ${NAME_HINT}にしてください`));
+  }
+  if (!NAME_RE.test(name)) throw new CliError(`投稿の名前は${NAME_HINT}にしてください: ${name}`);
+  const existing = await backend.read(identity.login, name);
+  const memKey = formatRef({ remote: remoteName, author: identity.login, name });
+  if (existing) ctx.io.err(s.dim(`公開済みの ${memKey}（版 ${shortVersion(existing.version)}）を更新します`));
+  else if (ref) throw new CliError(`${opts.update} はまだ公開されていません（レビュー待ちなら、--to ${remoteName} --name ${name} で出し直せます）`);
+  return { kind: "remote", backend, identity, name, memKey, existing };
 }
 
 function printHeader(

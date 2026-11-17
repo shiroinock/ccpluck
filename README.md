@@ -35,7 +35,8 @@ Node 22 と pnpm 10 で確認しています。
 | 2. cli | ✅ `export --mask` / `apply` / `history` / `undo` / `revert` |
 | 3. web（ローカル版） | ✅ もらう／公開するの 2 目的、1 件ずつ決めるタイムラインと一覧。テスト 21 件 |
 | 4. CLI の対話 | ✅ `pick`（自分の設定との比較、並び順、2 回目以降の差分、そのまま取り込み）と `publish`（マスク、1 件ずつ選んで理由を書く、`--update` で変わったところだけ）。投稿はファイルと URL で受け渡す。CLI のテスト 56 件 |
-| 5 以降 | GitHub バックエンド → フィードとモデレーション → 採用状況 → サーバーバックエンド（[docs/use-cases.md](docs/use-cases.md)） |
+| 5. GitHub バックエンド | 🚧 `remote add / list / sync / remove`、`search`、`show`、`updates`、`pick <置き場所>:<作者>/<名前>`（版を記録）、`publish --to`（投稿ごとのブランチに push して PR）。CLI のテスト 65 件。残り：`remote init`（npm 公開後） |
+| 6 以降 | フィードとモデレーション → サーバーバックエンド（[docs/use-cases.md](docs/use-cases.md)） |
 
 マイルストーン 4 以降は HANDOFF から組み直した。画面は CLI だけにし、投稿の置き場所はまず社内の GitHub リポジトリ、社外公開のときにサーバーを足す。経緯とユースケースは [docs/use-cases.md](docs/use-cases.md) にある。
 
@@ -85,15 +86,20 @@ node packages/cli/dist/bin.js --help      # 公開後は npx ccpluck
 
 | コマンド | 内容 |
 |---|---|
-| `ccpluck pick <投稿>` | 投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む。`<投稿>` は投稿・バンドル・settings.json のファイルか https URL。`--all`、非対話では `--only <itemId>` か `--yes-low` |
-| `ccpluck publish` | 自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る（既定 `./ccpluck-post.json`）。`--update <投稿>` で前回の選択と理由を引き継ぐ |
+| `ccpluck remote add <名前> github:<owner>/<repo>` | 投稿の置き場所（GitHub リポジトリ）を登録し、`~/.ccpluck/remotes/<名前>.git` に bare clone する。`--host`（GitHub Enterprise Server）、`--git-url` |
+| `ccpluck remote list / sync [名前] / remove <名前>` | 登録の一覧、最新の取得、登録を外す |
+| `ccpluck search [語]` | 置き場所の投稿を探す。`--in`、`--os`、`--tag`、`--key <項目の一部>`、`--for-me`（自分にない項目が多い順） |
+| `ccpluck show <投稿>` | 投稿を読む（項目ごとに「あなたにない／値が違う／同じ」と作者の理由） |
+| `ccpluck updates` | 置き場所から取り込んだ投稿のうち、前回の pick から更新され、新しく決める項目があるものを出す |
+| `ccpluck pick <投稿>` | 投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む。`<投稿>` は `<置き場所>:<作者>/<名前>`、または投稿・バンドル・settings.json のファイルか https URL。`--all`、非対話では `--only <itemId>` か `--yes-low` |
+| `ccpluck publish` | 自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る（既定 `./ccpluck-post.json`）。`--to <置き場所> [--name <名前>]` で置き場所に出す（PR を作る）。`--update <投稿>` で前回の選択と理由を引き継ぐ |
 | `ccpluck apply <bundle>` | 差分とリスクを表示 → 確認 → 適用。`<bundle>` はファイル、https URL、`-`（標準入力）。import バンドルと投稿（`export` の出力）のどちらも受け付ける |
 | `ccpluck history [importId]` | 取り込み履歴の一覧／詳細（`--json`） |
 | `ccpluck undo <importId>` | 取り込み単位で戻す |
 | `ccpluck revert <itemId>` | 項目単位で戻す（`--import <importId>` で対象の取り込みを指定） |
 | `ccpluck export --mask` | 手元の設定をマスクして投稿用 JSON を作る（`--public-env`、`--notes`、`--tag`、`-o`） |
 
-共通オプション: `--settings-path`（既定 `$CLAUDE_CONFIG_DIR/settings.json`、なければ `~/.claude/settings.json`）、`--data-dir`（既定 `$CCPLUCK_HOME`、なければ `~/.ccpluck`）。
+共通オプション: `--offline`（置き場所の最新を取らずに手元の写しを使う。search / show / updates / pick）、`--settings-path`（既定 `$CLAUDE_CONFIG_DIR/settings.json`、なければ `~/.claude/settings.json`）、`--data-dir`（既定 `$CCPLUCK_HOME`、なければ `~/.ccpluck`）。
 
 **pick の流れ**
 1. 投稿と自分の settings.json を読み、項目ごとに「持っていない／値が違う／同じ」を判定する。同じものは出さない
@@ -108,6 +114,17 @@ node packages/cli/dist/bin.js --help      # 公開後は npx ccpluck
 3. 1 キーで決める：`y` 公開する（続けて理由を 1 行で聞く。Enter で省略）、`n` 公開しない、`l` あとで、`w` 理由を書く、`e` 理由を `$VISUAL` / `$EDITOR` で書く、`v` env の値を公開する／隠す、`z` ひとつ戻す、`?` 詳しく、`q` ここで終える（残りは公開しない）
 4. タイトルと用途タグを聞き（`--title` / `--tag` があれば聞かない。OS は実行環境から）、公開される JSON の全文と、残っている確認してほしい箇所を見せてから書き出す
 5. 決めた結果を `~/.ccpluck/publish/` に覚える。`publish --update <投稿>` は、前回決めた項目のうち値が変わっていないものを聞かずに引き継ぎ（前回の投稿に入っていたものは「公開する」、理由もそのまま）、増えた・値が変わった項目だけを聞く。タイトルとタグは Enter で前回のまま
+
+**GitHub バックエンド**
+- 置き場所は `remote add` で登録する。手元には公開済みのブランチ（既定のブランチ）だけを bare clone で持ち、search / show / updates / pick のたびに fetch する（取れなければ警告して手元の写しを使う）
+- 投稿は `posts/<GitHub のログイン名>/<名前>.json`。版は、その投稿ファイルを最後に変えたコミット。`pick` は投稿の参照（`team:kenta/python`）と版を取り込み履歴に記録し、`history` に出す。`updates` は前回 pick した版と今の版を比べる
+- `publish --to team` は、GitHub のログイン名を API で調べ、投稿の名前を聞く。同じ名前の投稿が公開済みなら更新として、前回の選択と理由を引き継ぐ。PR がレビュー待ちのまま出し直したときも、手元に覚えた選択と理由を引き継ぐ
+- 送る直前にもう一度マスク漏れを検査してから push する（一度 push すると PR を閉じても GitHub に残るため）
+- コミットは作業ツリーを使わずに作る（一時的な index に投稿ファイルを足し、`commit-tree`）。親は最新の公開済みブランチ。作者は GitHub の noreply アドレス（`<ID>+<ログイン名>@users.noreply.github.com`）にし、手元の git に設定したメールアドレスは使わない
+- push 先は投稿ごとのブランチ `ccpluck/publish/<ログイン名>/<名前>`（自分のブランチなので force push）。そのブランチの PR が開いていれば push で更新され、なければ PR を作る。公開済みと同じ中身なら何も送らない
+- トークンは `CCPLUCK_GITHUB_TOKEN` / `GITHUB_TOKEN` / `GH_TOKEN`、なければ `gh auth token --hostname <host>`。https の clone・fetch・push では、利用者の credential helper の後ろにこのトークンを渡す helper を足す
+- `CCPLUCK_DEBUG=1` を付けると、実行する git と GitHub API の呼び出しを標準エラーに出す（トークンは出さない）
+- テストは手元の bare リポジトリを置き場所にし、GitHub の API（`/user`、PR の一覧と作成）は偽物に差し替えて、clone から PR 作成までを通す
 
 **apply の流れ**
 1. バンドルを検証する。ID と値が食い違う項目が 1 つでもあれば全体を中止する
@@ -209,6 +226,8 @@ HANDOFF の「未決事項」と、実装中に出てきた判断です。変更
 - `publish` の `v` で env の公開を許可しても、値がトークンなどの秘密のパターンに当たる場合はマスクしたままにし、その旨を表示する。書き出す直前にも core の `createPost` がマスク漏れを検査する
 - `publish` で env の公開を切り替えるとマスクが変わり、項目の並び順も変わりうる。いま見ているカードが入れ替わらないよう、最初の並び順を保つ
 - `publish --update` の引き継ぎは、マスク後の項目 ID と値のハッシュで判定する。前回の投稿に入っていた項目は、覚えた決定がなくても「公開する」として引き継ぐ（別のマシンで書き出した投稿でも使える）
+- 置き場所の名前・投稿の作者名・投稿の名前は、ファイルパスとブランチ名に使うので英数字と `._-` だけにする（`..` は不可）。`<置き場所>:<作者>/<名前>` の形で、置き場所が登録されていれば置き場所の投稿、そうでなければファイルとして読む
+- `remote init`（共有用リポジトリに設定ファイル・マスク検査の Actions・通報のテンプレートを入れる）は、Actions から ccpluck を動かすために npm への公開が要るので後回しにした
 - `pick --yes-low` が入れるのは「low・自分の設定にない・マスク値を含まない」項目だけ。値が違う項目は置き換えになるので入れない
 
 ### core の実装上の判断

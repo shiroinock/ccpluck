@@ -3,22 +3,36 @@ import { runApply } from "./commands/apply.js";
 import { runExport } from "./commands/export.js";
 import { runHistory, runRevert, runUndo } from "./commands/history.js";
 import { runPick } from "./commands/pick.js";
+import { runRemote } from "./commands/remote.js";
+import { runSearch, runShow, runUpdates } from "./commands/browse.js";
 import { runPublish } from "./commands/publish.js";
 import { CliError, resolvePaths, type Context } from "./context.js";
 
 export const USAGE = `ccpluck — Claude Code の settings.json を項目単位で取り込み・巻き戻す
 
 使い方:
+  ccpluck remote add <名前> github:<owner>/<repo>   投稿の置き場所（GitHub リポジトリ）を登録する
+      --host <host>            GitHub Enterprise Server のホスト名（既定: github.com）
+      --git-url <url>          clone に使う URL（既定: https://<host>/<owner>/<repo>.git）
+  ccpluck remote list | sync [名前] | remove <名前>
+  ccpluck search [語]           置き場所の投稿を探す（タイトル・タグ・作者・名前）
+      --in <置き場所>  --os <os>  --tag <tag>  --key <項目の一部（例: Bash(rm -rf *)）>
+      --for-me                 自分の設定にない項目が多い順に並べる
+  ccpluck show <投稿>           投稿を読む（自分の設定との比較つき）
+  ccpluck updates               前に取り込んだ投稿のうち、更新されたものを出す
   ccpluck pick <投稿>           投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む
-                               <投稿> は投稿・バンドル・settings.json のファイルか https URL
+                               <投稿> は <置き場所>:<作者>/<名前>、または投稿・バンドル・settings.json の
+                               ファイルか https URL
                                自分の settings.json と比べ、足りない項目・作者が理由を書いた項目から出す
       --all                    前回決めた項目も出す
       --only <itemId>          対話せず、指定した項目だけを取り込む（複数可）
       --yes-low                対話せず、low で自分の設定にない項目だけを取り込む
       --yes / --allow-high <itemId> / --dry-run   apply と同じ
+  ccpluck publish --to <置き場所> [--name <名前>]   置き場所に出す（GitHub では PR を作る）
   ccpluck publish               自分の設定をマスクし、公開する項目を 1 件ずつ選びながら理由を書いて投稿を作る
       -o, --output <file>      書き出し先（既定: --update の投稿、なければ ./ccpluck-post.json）
-      --update <post>          前に書き出した投稿の選択と理由を引き継ぎ、変わったところだけ聞く
+      --update <投稿>          前の投稿（ファイルか <置き場所>:<自分>/<名前>）の選択と理由を引き継ぎ、
+                               変わったところだけ聞く
       --public-env <KEY,...>   値を公開してよい env のキー（カードの [v] でも切り替えられる）
       --title <text> --os <macos|linux|windows|wsl|other> --tag <tag>
       --yes                    最後の確認を省略する
@@ -43,6 +57,7 @@ export const USAGE = `ccpluck — Claude Code の settings.json を項目単位�
       --yes                    確認を省略する
 
 共通オプション:
+  --offline                    置き場所の最新を取らずに、手元の写しを使う（search / show / updates / pick）
   --settings-path <path>       対象の settings.json（既定: ~/.claude/settings.json）
   --data-dir <path>            履歴の保存先（既定: ~/.ccpluck）
   -h, --help
@@ -54,9 +69,22 @@ const COMMON = {
   help: { type: "boolean", short: "h" },
 } as const satisfies ParseArgsConfig["options"];
 
+const BROWSE = { ...COMMON, offline: { type: "boolean" } } as const satisfies ParseArgsConfig["options"];
+
 const COMMANDS = {
+  remote: { ...COMMON, host: { type: "string" }, "git-url": { type: "string" } },
+  search: {
+    ...BROWSE,
+    in: { type: "string" },
+    os: { type: "string" },
+    tag: { type: "string", multiple: true },
+    key: { type: "string" },
+    "for-me": { type: "boolean" },
+  },
+  show: BROWSE,
+  updates: BROWSE,
   pick: {
-    ...COMMON,
+    ...BROWSE,
     all: { type: "boolean" },
     only: { type: "string", multiple: true },
     "yes-low": { type: "boolean" },
@@ -73,6 +101,8 @@ const COMMANDS = {
     os: { type: "string" },
     tag: { type: "string", multiple: true },
     yes: { type: "boolean", short: "y" },
+    to: { type: "string" },
+    name: { type: "string" },
   },
   apply: {
     ...COMMON,
@@ -144,7 +174,33 @@ async function dispatch(cmd: CommandName, args: string[], ctx: Context): Promise
   };
   const list = (k: string) => ((o[k] as string[] | undefined) ?? []).flatMap((x) => x.split(",")).map((x) => x.trim()).filter(Boolean);
 
+  const offline = Boolean(o.offline);
   switch (cmd) {
+    case "remote":
+      return runRemote(ctx, {
+        dataDir: paths.dataDir,
+        action: positionals[0] ?? "list",
+        args: positionals.slice(1),
+        ...(o.host ? { host: o.host as string } : {}),
+        ...(o["git-url"] ? { gitUrl: o["git-url"] as string } : {}),
+      });
+    case "search":
+      if (positionals.length > 1) throw new CliError("検索語は 1 つにしてください（空白を含むなら引用符で囲む）");
+      return runSearch(ctx, {
+        ...paths,
+        offline,
+        tags: list("tag"),
+        forMe: Boolean(o["for-me"]),
+        ...(positionals[0] ? { query: positionals[0] } : {}),
+        ...(o.in ? { in: o.in as string } : {}),
+        ...(o.os ? { os: o.os as string } : {}),
+        ...(o.key ? { key: o.key as string } : {}),
+      });
+    case "show":
+      return runShow(ctx, { ...paths, offline, input: one("<投稿>") });
+    case "updates":
+      if (positionals.length > 0) throw new CliError("updates は位置引数を取りません");
+      return runUpdates(ctx, { ...paths, offline });
     case "pick":
       if (o.only && o["yes-low"]) throw new CliError("--only と --yes-low は同時に指定できません");
       return runPick(ctx, {
@@ -156,6 +212,7 @@ async function dispatch(cmd: CommandName, args: string[], ctx: Context): Promise
         yes: Boolean(o.yes),
         allowHigh: (o["allow-high"] as string[] | undefined) ?? [],
         dryRun: Boolean(o["dry-run"]),
+        offline,
       });
     case "publish":
       if (positionals.length > 0) throw new CliError("publish は位置引数を取りません");
@@ -168,6 +225,8 @@ async function dispatch(cmd: CommandName, args: string[], ctx: Context): Promise
         ...(o.update ? { update: o.update as string } : {}),
         ...(o.title ? { title: o.title as string } : {}),
         ...(o.os ? { os: o.os as string } : {}),
+        ...(o.to ? { to: o.to as string } : {}),
+        ...(o.name ? { name: o.name as string } : {}),
       });
     case "apply": {
       if (o.overwrite && o["skip-conflicts"]) throw new CliError("--overwrite と --skip-conflicts は同時に指定できません");

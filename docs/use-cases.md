@@ -77,25 +77,25 @@ interface Principal {
 | ID | ユースケース | コマンド（案） | 状態 |
 |---|---|---|---|
 | U1 | 社内で共有用のリポジトリを用意する（設定ファイル、マスク検査の Actions、Issue のテンプレートを入れる） | `ccpluck remote init github:example-org/claude-settings` | 未 |
-| U2 | 置き場所を登録する・最新にする・外す | `ccpluck remote add / sync / remove` | 未 |
+| U2 | 置き場所を登録する・最新にする・外す | `ccpluck remote add / sync / remove` | 済 |
 
 ### 探す・読む
 
 | ID | ユースケース | コマンド（案） | 状態 |
 |---|---|---|---|
-| U3 | タグ・OS・キーで投稿を探す（例：`Bash(rm -rf *)` を deny している投稿） | `ccpluck search safety --os macos`、`ccpluck search --key 'permissions.deny:Bash(rm -rf *)'` | 未 |
-| U4 | 自分に役立ちそうな投稿を探す（自分に足りないキーが多い順） | `ccpluck search --for-me` | 未 |
-| U5 | 投稿を読む（項目、作者の理由、自分との比較。サーバーでは採用率も） | `ccpluck show <投稿>` | 未 |
+| U3 | タグ・OS・キーで投稿を探す（例：`Bash(rm -rf *)` を deny している投稿） | `ccpluck search safety --os macos`、`ccpluck search --key 'permissions.deny:Bash(rm -rf *)'` | 済 |
+| U4 | 自分に役立ちそうな投稿を探す（自分に足りないキーが多い順） | `ccpluck search --for-me` | 済 |
+| U5 | 投稿を読む（項目、作者の理由、自分との比較。サーバーでは採用率も） | `ccpluck show <投稿>` | 済 |
 | U6 | 人やタグをフォローし、新しい投稿・更新された投稿を順に見る | `ccpluck follow kenta`、`ccpluck feed` | 未 |
-| U7 | 前に取り込んだ投稿が更新されたことを知る | `ccpluck updates` | 未 |
+| U7 | 前に取り込んだ投稿が更新されたことを知る | `ccpluck updates` | 済 |
 
 ### もらう
 
 | ID | ユースケース | コマンド（案） | 状態 |
 |---|---|---|---|
-| U8 | 投稿から欲しいキーを 1 つずつ選び、そのまま取り込む | `ccpluck pick <投稿>` | 済（ファイルと URL。置き場所からは M5） |
+| U8 | 投稿から欲しいキーを 1 つずつ選び、そのまま取り込む | `ccpluck pick <投稿>` | 済 |
 | U9 | 自分がすでに持っているか、値が違うかを見ながら選ぶ | `pick` が自動で比べる | 済 |
-| U10 | 前に取り込んだ投稿の、前回から増えた・変わったキーだけを選ぶ | `ccpluck pick <投稿>`（2 回目以降は差分だけ） | 済（同じファイルパス・URL を同じ投稿とみなす） |
+| U10 | 前に取り込んだ投稿の、前回から増えた・変わったキーだけを選ぶ | `ccpluck pick <投稿>`（2 回目以降は差分だけ） | 済（置き場所の投稿は `team:kenta/python` で、ファイルと URL は同じパス・URL で同じ投稿とみなす） |
 | U11 | high の項目と値が置き換わる項目を確認して入れる／飛ばす | `pick` / `apply` の最後 | 済 |
 | U12 | マスクされた値に自分の値を入れる／飛ばす | 同上 | 済 |
 | U13 | hook が参照するスクリプトが手元にあるか知る | 同上 | 済 |
@@ -105,7 +105,7 @@ interface Principal {
 
 | ID | ユースケース | コマンド | 状態 |
 |---|---|---|---|
-| U15 | いつ何を取り込んだかを見る（どの投稿のどの版から来たかも） | `ccpluck history` | 一部（投稿の版は未記録） |
+| U15 | いつ何を取り込んだかを見る（どの投稿のどの版から来たかも） | `ccpluck history` | 済 |
 | U16 | 取り込みを丸ごと戻す | `ccpluck undo <取り込み ID>` | 済 |
 | U17 | 取り込んだキーを 1 つだけ戻す | `ccpluck revert <キー>` | 済 |
 
@@ -113,8 +113,8 @@ interface Principal {
 
 | ID | ユースケース | コマンド（案） | 状態 |
 |---|---|---|---|
-| U18 | 自分の settings.json を読み、マスクし、公開する項目を 1 つずつ選びながら理由を書く | `ccpluck publish --to team` | 一部（ファイルへの書き出しは済。`--to` は M5） |
-| U19 | 設定を変えたので投稿を更新する。前回の選択と理由を引き継ぎ、変わったところだけ聞かれる | `ccpluck publish --update <投稿>` | 済（ファイル） |
+| U18 | 自分の settings.json を読み、マスクし、公開する項目を 1 つずつ選びながら理由を書く | `ccpluck publish --to team` | 済 |
+| U19 | 設定を変えたので投稿を更新する。前回の選択と理由を引き継ぎ、変わったところだけ聞かれる | `ccpluck publish --update <投稿>` | 済 |
 | U20 | 自分の投稿の状態（レビュー待ち・差し戻し・公開済み）を見る。サーバーでは反応も | `ccpluck posts`、`ccpluck posts <投稿>` | 未 |
 | U21 | 自分の投稿を消す | `ccpluck unpublish <投稿>` | 未 |
 
@@ -309,7 +309,7 @@ main                                    公開済みの投稿
 |---|---|
 | M1〜M3 | 済（core、CLI の apply / history / undo / revert / export、Web ローカル版） |
 | M4 | 済。CLI の対話：`pick`（比較・並び順・2 回目以降の差分・一発取り込み）と `publish`（選択・理由・更新）。投稿はファイルと URL で受け渡し |
-| M5 | GitHub バックエンド：`remote init / add / sync`、`publish --to`（PR）、`search`、`show`、`pick` の置き場所対応と版の記録、`updates` |
+| M5 | ほぼ済（`remote init` は npm 公開後）。GitHub バックエンド：`remote init / add / sync`、`publish --to`（PR）、`search`、`show`、`pick` の置き場所対応と版の記録、`updates` |
 | M6 | フォローとフィード、モデレーション：`follow`、`feed`、`posts`、`report`、`admin review / reports` |
 | — | 手元の履歴を git に載せ替える（M5 の後、M6 と並行でもよい） |
 | — | 社内で使われ方を見る |

@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import {
   containsMasked,
   decide,
@@ -22,7 +21,9 @@ import { CliError, type Context } from "../context.js";
 import { readSettingsFile } from "../fsutil.js";
 import { PickMemoryStore, valueHash, type PickMemory } from "../pick-memory.js";
 import { indent, makeStyle, riskBadge, short, type Style } from "../render.js";
-import { applyItems, loadJsonInput } from "./apply.js";
+import { formatRef } from "../backend.js";
+import { resolvePostInput, shortDate, shortVersion, type ResolvedPost } from "../post-input.js";
+import { applyItems } from "./apply.js";
 
 export interface PickOptions {
   input: string;
@@ -38,17 +39,12 @@ export interface PickOptions {
   yes: boolean;
   allowHigh: string[];
   dryRun: boolean;
+  /** 置き場所の最新を取らずに、手元の写しで選ぶ */
+  offline?: boolean;
 }
 
 const KEYS = ["y", "n", "l", "z", "?", "q"];
 const PROMPT = "[y] もらう  [n] もらわない  [l] あとで  [z] ひとつ戻す  [?] 詳しく  [q] ここで終える > ";
-
-/** 2 回目以降の pick で「同じ投稿」とみなすための参照。標準入力は覚えない */
-function sourceKeyOf(ctx: Context, input: string): string | undefined {
-  if (input === "-") return undefined;
-  if (/^https?:\/\//i.test(input)) return input.replace(/#.*$/, "");
-  return resolve(ctx.cwd, input);
-}
 
 export async function runPick(ctx: Context, opts: PickOptions): Promise<number> {
   const { io } = ctx;
@@ -62,7 +58,8 @@ export async function runPick(ctx: Context, opts: PickOptions): Promise<number> 
   }
 
   // 1. 投稿と自分の設定を読む
-  const src = parsePickSource(await loadJsonInput(ctx, opts.input, "投稿"));
+  const resolved = await resolvePostInput(ctx, opts.dataDir, opts.input, { offline: Boolean(opts.offline), style: s });
+  const src = parsePickSource(resolved.raw);
   if (src.errors.length > 0) throw new CliError(`投稿を読めません:\n  ${src.errors.join("\n  ")}`);
   for (const w of src.warnings) io.err(s.yellow(`警告: ${w.message}${w.at ? `: ${w.at}` : ""}`));
   if (src.items.length === 0) {
@@ -73,7 +70,7 @@ export async function runPick(ctx: Context, opts: PickOptions): Promise<number> 
   const all = pickCandidates(src.items, src.notes, file.settings);
 
   // 2. 前回決めた項目（値が変わっていないもの）は出さない
-  const key = sourceKeyOf(ctx, opts.input);
+  const key = resolved.sourceKey;
   const memStore = new PickMemoryStore(opts.dataDir);
   const memory = key ? await memStore.load(key) : undefined;
   const decidedBefore = (c: PickCandidate) => {
@@ -84,7 +81,7 @@ export async function runPick(ctx: Context, opts: PickOptions): Promise<number> 
   const skippedBefore = all.length - cands.length;
 
   const title = src.meta?.title ?? src.source?.title ?? opts.input;
-  printHeader(ctx, s, { title, src, opts, fileExists: file.text !== null, all, skippedBefore });
+  printHeader(ctx, s, { title, src, opts, fileExists: file.text !== null, all, skippedBefore, resolved });
 
   // 3. 選ぶ
   let state: PickState = emptyPickState();
@@ -114,6 +111,7 @@ export async function runPick(ctx: Context, opts: PickOptions): Promise<number> 
       version: 1,
       sourceKey: key,
       ...(title !== opts.input ? { title } : {}),
+      ...(resolved.post ? { postVersion: resolved.post.version } : {}),
       updatedAt: now,
       decisions: { ...(memory?.decisions ?? {}) },
     };
@@ -145,8 +143,9 @@ export async function runPick(ctx: Context, opts: PickOptions): Promise<number> 
   const source = {
     input: opts.input,
     ...(title !== opts.input ? { title } : {}),
-    ...(/^https?:\/\//i.test(opts.input) ? { url: opts.input } : {}),
-    ...(src.source?.author ? { author: src.source.author } : {}),
+    ...(resolved.url ? { url: resolved.url } : {}),
+    ...(resolved.post ? { author: resolved.post.author } : src.source?.author ? { author: src.source.author } : {}),
+    ...(resolved.post ? { post: formatRef(resolved.post), version: resolved.post.version } : {}),
   };
   const r = await applyItems(ctx, {
     settingsPath: opts.settingsPath,
@@ -175,12 +174,16 @@ function printHeader(
     fileExists: boolean;
     all: PickCandidate[];
     skippedBefore: number;
+    resolved: ResolvedPost;
   },
 ): void {
   const { io } = ctx;
   const meta = p.src.meta;
-  const tags = [meta?.os, ...(meta?.tags ?? []).map((t) => `#${t}`), p.src.source?.author && `by ${p.src.source.author}`].filter(Boolean);
+  const post = p.resolved.post;
+  const author = post?.author ?? p.src.source?.author;
+  const tags = [meta?.os, ...(meta?.tags ?? []).map((t) => `#${t}`), author && `by ${author}`].filter(Boolean);
   io.err(`\n${s.bold(p.title)}${tags.length > 0 ? `  ${s.dim(tags.join("  "))}` : ""}`);
+  if (post) io.err(s.dim(`${formatRef(post)}  版 ${shortVersion(post.version)}（${shortDate(post.date)}）`));
   if (p.src.kind === "settings") io.err(s.dim("settings.json として読み込みました（作者の理由はありません）"));
   io.err(s.dim(`比べる相手: ${p.opts.settingsPath}${p.fileExists ? "" : "（まだありません）"}`));
   const count = (k: string) => p.all.filter((c) => c.mine.kind === k).length;

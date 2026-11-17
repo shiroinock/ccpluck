@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { JsonValue, PickDecision } from "@ccpluck/core";
 import { atomicWrite } from "./fsutil.js";
@@ -13,6 +13,8 @@ export interface PickMemory {
   /** 投稿の参照（URL や絶対パス） */
   sourceKey: string;
   title?: string;
+  /** 最後に pick したときの投稿の版（置き場所の投稿のみ。updates で使う） */
+  postVersion?: string;
   updatedAt: string;
   decisions: Record<string, { decision: PickDecision; valueHash: string; at: string }>;
 }
@@ -49,6 +51,26 @@ export class PickMemoryStore {
     await mkdir(join(this.dataDir, "picks"), { recursive: true, mode: 0o700 });
     await atomicWrite(this.file(m.sourceKey), `${JSON.stringify(m, null, 2)}\n`);
   }
+
+  /** 覚えているすべての投稿 */
+  async list(): Promise<PickMemory[]> {
+    let files: string[];
+    try {
+      files = await readdir(join(this.dataDir, "picks"));
+    } catch {
+      return [];
+    }
+    const out: PickMemory[] = [];
+    for (const f of files.filter((x) => x.endsWith(".json"))) {
+      try {
+        const m = JSON.parse(await readFile(join(this.dataDir, "picks", f), "utf8")) as PickMemory;
+        if (m.version === 1 && typeof m.sourceKey === "string") out.push(m);
+      } catch {
+        /* 壊れたファイルは飛ばす */
+      }
+    }
+    return out;
+  }
 }
 
 /**
@@ -63,6 +85,8 @@ export interface PublishMemory {
   updatedAt: string;
   publicEnv: string[];
   decisions: Record<string, { decision: PickDecision; valueHash: string; at: string }>;
+  /** 書いた理由（項目 ID → 文）。レビュー待ちで公開前の投稿を出し直すときに引き継ぐ */
+  whys?: Record<string, string>;
 }
 
 export class PublishMemoryStore {
