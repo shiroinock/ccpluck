@@ -11,14 +11,18 @@ import {
   createBundle,
   createPost,
   decompose,
-  deepEqual,
-  getItemValue,
   POST_FORMAT,
   describeItem,
   isPlainObject,
   itemDependencies,
   maskSettings,
   maskedItemPairs,
+  pickAttention,
+  itemGroup,
+  itemLabel,
+  itemValueText,
+  compareWithMine,
+  type MineStatus,
   validateSettings,
   walkStrings,
   type Dependency,
@@ -130,19 +134,8 @@ export interface Options {
   authorNotes?: Notes;
 }
 
-/** 自分の settings.json と比べた結果 */
-export type MineStatus =
-  | { kind: "new" }
-  | { kind: "same" }
-  | { kind: "differs"; value: JsonValue };
-
-export function compareWithMine(item: Item, mine: Settings): MineStatus {
-  const v = getItemValue(mine, item.id);
-  if (v === undefined) return { kind: "new" };
-  // 配列要素と hook は「同じものがある」＝取り込んでも変わらない（hook は同じコマンドなら重複扱い）
-  if (item.kind === "array-element" || item.kind === "hook" || deepEqual(v, item.value)) return { kind: "same" };
-  return { kind: "differs", value: v };
-}
+/** 自分の settings.json との比較は core と共通 */
+export { compareWithMine, type MineStatus } from "@ccpick/core";
 
 export interface Row {
   /** 選択や注釈の状態を持つキー。マスクの有無で変わらないよう、元の項目 ID を使う */
@@ -209,42 +202,17 @@ export function buildModel(settings: Settings, opts: Options): Model {
 
 /** 一覧の見出し。permissions と hooks は中の種類ごとに分ける */
 export function groupOf(item: Item): string {
-  const [top, sub] = item.path;
-  if (top === "permissions" && sub && item.kind === "array-element") return `permissions.${sub}`;
-  if (top === "hooks" && sub) return `hooks.${sub}`;
-  if (top === "permissions" || top === "env" || top === "hooks") return top;
-  return item.kind === "other" ? "スキーマにないキー" : "その他の設定";
+  return itemGroup(item);
 }
 
 /** 項目の見出しに出す短いラベル */
 export function rowLabel(row: Row): string {
-  const item = row.item;
-  switch (item.kind) {
-    case "array-element":
-      return String(item.value);
-    case "hook": {
-      const m = item.hook?.matcher;
-      return m === undefined ? "（matcher なし）" : `matcher: ${m}`;
-    }
-    case "map-entry":
-      return item.path[1] ?? item.id;
-    default:
-      return item.path.join(".");
-  }
+  return itemLabel(row.item);
 }
 
 /** 値の表示。配列要素はラベルと同じなので出さない */
 export function rowValueText(row: Row): string | undefined {
-  const item = row.item;
-  if (item.kind === "array-element") return undefined;
-  if (item.kind === "hook" && isPlainObject(item.value)) {
-    const v = item.value;
-    const main = typeof v.command === "string" ? v.command : typeof v.prompt === "string" ? v.prompt : undefined;
-    const rest = Object.fromEntries(Object.entries(v).filter(([k]) => k !== "command" && k !== "prompt"));
-    const tail = Object.keys(rest).length > 0 ? `\n${JSON.stringify(rest)}` : "";
-    return main !== undefined ? main + tail : JSON.stringify(v, null, 2);
-  }
-  return typeof item.value === "string" ? item.value : JSON.stringify(item.value, null, 2);
+  return itemValueText(row.item);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,12 +376,7 @@ export function attentionOf(row: Row): Attention {
  * 同じ設定をすでに持っている項目は出さない（rank 9）。
  */
 export function pickAttentionOf(row: Row): Attention {
-  const m = row.mine?.kind;
-  if (m === "same") return { rank: 9, reason: "同じ設定をすでに持っています" };
-  if (m === "differs") return { rank: 3, reason: "あなたの設定と値が違います" };
-  if (row.authorWhy) return { rank: 0, reason: m === "new" ? "あなたの設定になく、作者が理由を書いています" : "作者が理由を書いています" };
-  if (m === "new") return { rank: 1, reason: "あなたの設定にない項目です" };
-  return { rank: 2, reason: "この投稿の項目です" };
+  return pickAttention({ ...(row.mine ? { mine: row.mine } : {}), ...(row.authorWhy ? { why: row.authorWhy } : {}) });
 }
 
 export function attentionFor(purpose: Purpose, row: Row): Attention {

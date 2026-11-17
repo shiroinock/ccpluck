@@ -9,3 +9,4 @@ export * from "./deps.js";
 export * from "./validate.js";
 export * from "./bundle.js";
 export { TOP_LEVEL_KEYS, PERMISSIONS_KEYS, type SchemaKeyInfo } from "./schema-snapshot.js";
+export * from "./pick.js";

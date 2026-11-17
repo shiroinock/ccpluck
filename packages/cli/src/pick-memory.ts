@@ -1,0 +1,52 @@
+import { createHash } from "node:crypto";
+import { mkdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { JsonValue, PickDecision } from "@ccpick/core";
+import { atomicWrite } from "./fsutil.js";
+
+/**
+ * 同じ投稿を前に pick したときの決定。~/.ccpick/picks/<投稿の参照のハッシュ>.json に保存する。
+ * 2 回目以降の pick で、前回決めた項目（値が変わっていないもの）をもう一度聞かないために使う。
+ */
+export interface PickMemory {
+  version: 1;
+  /** 投稿の参照（URL や絶対パス） */
+  sourceKey: string;
+  title?: string;
+  updatedAt: string;
+  decisions: Record<string, { decision: PickDecision; valueHash: string; at: string }>;
+}
+
+/** キー順に依存しない JSON 文字列のハッシュ（投稿の書き直しでキー順が変わっても同じ値とみなす） */
+export function valueHash(v: JsonValue): string {
+  const canon = (x: JsonValue): JsonValue =>
+    Array.isArray(x)
+      ? x.map(canon)
+      : x !== null && typeof x === "object"
+        ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, canon(x[k] as JsonValue)]))
+        : x;
+  return createHash("sha256").update(JSON.stringify(canon(v)), "utf8").digest("hex").slice(0, 32);
+}
+
+export class PickMemoryStore {
+  constructor(public readonly dataDir: string) {}
+
+  private file(sourceKey: string): string {
+    const h = createHash("sha256").update(sourceKey, "utf8").digest("hex").slice(0, 32);
+    return join(this.dataDir, "picks", `${h}.json`);
+  }
+
+  async load(sourceKey: string): Promise<PickMemory | undefined> {
+    try {
+      const m = JSON.parse(await readFile(this.file(sourceKey), "utf8")) as PickMemory;
+      return m.version === 1 && m.sourceKey === sourceKey ? m : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async save(m: PickMemory): Promise<void> {
+    await mkdir(join(this.dataDir, "picks"), { recursive: true, mode: 0o700 });
+    await atomicWrite(this.file(m.sourceKey), `${JSON.stringify(m, null, 2)}\n`);
+  }
+}

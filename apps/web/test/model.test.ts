@@ -86,7 +86,7 @@ describe("buildModel", () => {
     ]);
     const hook = m.rows.find((r) => r.item.kind === "hook")!;
     expect(rowLabel(hook)).toBe("matcher: Bash");
-    expect(rowValueText(hook)).toBe('~/.claude/hooks/block-dangerous.sh\n{"type":"command","timeout":10}');
+    expect(rowValueText(hook)).toBe('~/.claude/hooks/block-dangerous.sh\n{"timeout":10}');
   });
 });
 

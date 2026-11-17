@@ -2,11 +2,19 @@ import { parseArgs, type ParseArgsConfig } from "node:util";
 import { runApply } from "./commands/apply.js";
 import { runExport } from "./commands/export.js";
 import { runHistory, runRevert, runUndo } from "./commands/history.js";
+import { runPick } from "./commands/pick.js";
 import { CliError, resolvePaths, type Context } from "./context.js";
 
 export const USAGE = `ccpick — Claude Code の settings.json を項目単位で取り込み・巻き戻す
 
 使い方:
+  ccpick pick <投稿>           投稿から欲しい項目を 1 件ずつ選び、そのまま取り込む
+                               <投稿> は投稿・バンドル・settings.json のファイルか https URL
+                               自分の settings.json と比べ、足りない項目・作者が理由を書いた項目から出す
+      --all                    前回決めた項目も出す
+      --only <itemId>          対話せず、指定した項目だけを取り込む（複数可）
+      --yes-low                対話せず、low で自分の設定にない項目だけを取り込む
+      --yes / --allow-high <itemId> / --dry-run   apply と同じ
   ccpick apply <bundle>        差分とリスクを表示し、確認してから適用する
                                <bundle> はファイル、https URL、または - (標準入力)
       --yes                    全体の確認を省略する（high リスク項目は別途確認が必要）
@@ -40,6 +48,15 @@ const COMMON = {
 } as const satisfies ParseArgsConfig["options"];
 
 const COMMANDS = {
+  pick: {
+    ...COMMON,
+    all: { type: "boolean" },
+    only: { type: "string", multiple: true },
+    "yes-low": { type: "boolean" },
+    yes: { type: "boolean", short: "y" },
+    "allow-high": { type: "string", multiple: true },
+    "dry-run": { type: "boolean" },
+  },
   apply: {
     ...COMMON,
     yes: { type: "boolean", short: "y" },
@@ -111,6 +128,18 @@ async function dispatch(cmd: CommandName, args: string[], ctx: Context): Promise
   const list = (k: string) => ((o[k] as string[] | undefined) ?? []).flatMap((x) => x.split(",")).map((x) => x.trim()).filter(Boolean);
 
   switch (cmd) {
+    case "pick":
+      if (o.only && o["yes-low"]) throw new CliError("--only と --yes-low は同時に指定できません");
+      return runPick(ctx, {
+        ...paths,
+        input: one("<投稿>"),
+        all: Boolean(o.all),
+        only: (o.only as string[] | undefined) ?? [],
+        yesLow: Boolean(o["yes-low"]),
+        yes: Boolean(o.yes),
+        allowHigh: (o["allow-high"] as string[] | undefined) ?? [],
+        dryRun: Boolean(o["dry-run"]),
+      });
     case "apply": {
       if (o.overwrite && o["skip-conflicts"]) throw new CliError("--overwrite と --skip-conflicts は同時に指定できません");
       return runApply(ctx, {

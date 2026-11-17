@@ -16,7 +16,7 @@ import {
   type SkipReason,
 } from "@ccpick/core";
 import { CliError, type Context } from "../context.js";
-import { exists, readSettingsFile, sha256, writeSettings } from "../fsutil.js";
+import { exists, readSettingsFile, sha256, writeSettings, type SettingsFile } from "../fsutil.js";
 import { indent, itemLine, makeStyle, pretty, riskBadge, short } from "../render.js";
 import { Store, type ImportRecord } from "../store.js";
 
@@ -43,28 +43,29 @@ const SKIP_LABEL: Record<SkipReason, string> = {
   "invalid-target": "既存の設定の形が合わず適用できない",
 };
 
-async function loadInput(ctx: Context, input: string): Promise<unknown> {
+/** ファイル・https URL・標準入力（-）から JSON を読む */
+export async function loadJsonInput(ctx: Context, input: string, what = "バンドル"): Promise<unknown> {
   let text: string;
   if (input === "-") {
     text = await ctx.io.readStdin();
   } else if (/^https?:\/\//i.test(input)) {
     if (!/^https:\/\//i.test(input) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(input)) {
-      throw new CliError("バンドルの URL は https のみ対応しています");
+      throw new CliError(`${what}の URL は https のみ対応しています`);
     }
     const res = await ctx.fetch(input);
-    if (!res.ok) throw new CliError(`バンドルを取得できません: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new CliError(`${what}を取得できません: ${res.status} ${res.statusText}`);
     text = await res.text();
   } else {
     try {
       text = await readFile(resolve(ctx.cwd, input), "utf8");
     } catch (e) {
-      throw new CliError(`バンドルを読めません: ${(e as Error).message}`);
+      throw new CliError(`${what}を読めません: ${(e as Error).message}`);
     }
   }
   try {
     return JSON.parse(text);
   } catch (e) {
-    throw new CliError(`バンドルが JSON ではありません: ${(e as Error).message}`);
+    throw new CliError(`${what}が JSON ではありません: ${(e as Error).message}`);
   }
 }
 
@@ -99,7 +100,7 @@ export async function runApply(ctx: Context, opts: ApplyOptions): Promise<number
   const s = makeStyle(io.color);
 
   // 1. バンドルを読む
-  const parsed = parseBundle(await loadInput(ctx, opts.input));
+  const parsed = parseBundle(await loadJsonInput(ctx, opts.input));
   if (parsed.errors.length > 0) {
     throw new CliError(`バンドルに不正な項目があるため中止しました:\n  ${parsed.errors.join("\n  ")}`);
   }
@@ -108,15 +109,53 @@ export async function runApply(ctx: Context, opts: ApplyOptions): Promise<number
     io.err("取り込む項目がありません");
     return 0;
   }
-  const notes: Notes = parsed.notes;
   const file = await readSettingsFile(opts.settingsPath);
-
   io.err(s.bold(`\n取り込み元: ${parsed.source?.title ?? opts.input}`));
   io.err(s.dim(`対象: ${opts.settingsPath}${file.text === null ? "（新規作成）" : ""}\n`));
+  const r = await applyItems(ctx, {
+    ...opts,
+    items: parsed.items,
+    notes: parsed.notes,
+    source: { input: opts.input, ...parsed.source },
+    file,
+  });
+  return r.code;
+}
+
+export interface ApplyItemsOptions extends Omit<ApplyOptions, "input" | "onConflict"> {
+  items: Item[];
+  notes: Notes;
+  source: ImportRecord["source"];
+  file: SettingsFile;
+  /** 衝突時の既定の扱い（項目ごとの指定がないとき） */
+  onConflict?: ConflictDecision;
+  /** 項目ごとに決まっている衝突の扱い（pick で「置き換わります」を見て選んだものなど） */
+  decisions?: Record<string, ConflictDecision>;
+  /** 最後の確認で Enter だけなら適用する（pick で 1 件ずつ決めた後など） */
+  defaultYes?: boolean;
+}
+
+export interface ApplyItemsResult {
+  code: number;
+  /** 書き込んだときの取り込み ID */
+  importId?: string;
+  /** 書き込みまで進まずに中止した（最後の確認で断った） */
+  aborted?: boolean;
+}
+
+/**
+ * 項目を settings.json に取り込む。マスク値の入力、衝突の判断、high の確認、計画の表示、
+ * 最後の確認、履歴の記録、書き込みを順に行う。apply と pick が共有する。
+ */
+export async function applyItems(ctx: Context, opts: ApplyItemsOptions): Promise<ApplyItemsResult> {
+  const { io } = ctx;
+  const s = makeStyle(io.color);
+  const notes = opts.notes;
+  const file = opts.file;
 
   // 2. マスク値の入力
   let items: Item[] = [];
-  for (const item of parsed.items) {
+  for (const item of opts.items) {
     if (!containsMasked(item.value)) {
       items.push(item);
       continue;
@@ -148,6 +187,11 @@ export async function runApply(ctx: Context, opts: ApplyOptions): Promise<number
   const preview = mergeItems(file.settings, items, { confirmedHighRisk: allIds });
   const decisions: Record<string, ConflictDecision> = {};
   for (const c of preview.conflicts) {
+    const preset = opts.decisions?.[c.itemId];
+    if (preset) {
+      decisions[c.itemId] = preset;
+      continue;
+    }
     io.err(`${s.yellow("衝突")} ${s.bold(c.itemId)}`);
     io.err(`  いまの値:   ${short(c.existing)}`);
     io.err(`  取り込む値: ${short(c.incoming)}`);
@@ -197,18 +241,20 @@ export async function runApply(ctx: Context, opts: ApplyOptions): Promise<number
 
   if (result.applied.length === 0) {
     io.err("\n変更はありません");
-    return 0;
+    return { code: 0 };
   }
   if (opts.dryRun) {
     io.err(s.dim("\n--dry-run のため書き込みません"));
-    return 0;
+    return { code: 0 };
   }
   if (!opts.yes) {
     if (!io.interactive) throw new CliError("確認が必要です。内容を確認したうえで --yes を付けて実行してください");
-    const a = (await io.ask(`\n${result.applied.length} 件を適用しますか? [y/N] `)).trim().toLowerCase();
-    if (a !== "y" && a !== "yes") {
+    const hint = opts.defaultYes ? "[Y/n]" : "[y/N]";
+    const a = (await io.ask(`\n${result.applied.length} 件を適用しますか? ${hint} `)).trim().toLowerCase();
+    const ok = a === "y" || a === "yes" || (opts.defaultYes === true && a === "");
+    if (!ok) {
       io.err("中止しました");
-      return 1;
+      return { code: 1, aborted: true };
     }
   }
 
@@ -221,7 +267,7 @@ export async function runApply(ctx: Context, opts: ApplyOptions): Promise<number
     id,
     createdAt: ctx.now().toISOString(),
     settingsPath: opts.settingsPath,
-    source: { input: opts.input, ...parsed.source },
+    source: opts.source,
     beforeText: file.text,
     afterSha256: sha256(afterText),
     ops: result.applied,
@@ -238,7 +284,7 @@ export async function runApply(ctx: Context, opts: ApplyOptions): Promise<number
   }
   io.err(s.green(`\n適用しました。importId: ${id}`));
   io.err(s.dim(`戻すには: ccpick undo ${id}`));
-  return 0;
+  return { code: 0, importId: id };
 }
 
 function printPlan(ctx: Context, result: MergeResult, items: Item[], notes: Notes): void {
