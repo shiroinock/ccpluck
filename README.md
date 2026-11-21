@@ -27,6 +27,20 @@ pnpm update-schema   # schemastore の JSON Schema から packages/core/src/sche
 
 Node 24 と pnpm 10 で確認しています。
 
+### Nix
+
+```bash
+nix run github:shiroinock/ccpluck -- --help    # インストールせずに実行
+nix build                                       # ./result/bin/ccpluck（ビルド中に core と CLI のテストも走る）
+nix develop                                     # Node 22・pnpm・git の入った開発シェル
+nix flake check
+```
+
+- `flake.nix` は aarch64-darwin / x86_64-linux / aarch64-linux に対応する（x86_64-darwin は対象外）。nixpkgs は `nixpkgs-unstable` の 1 つだけ
+- 依存は `pnpm-lock.yaml` から `fetchPnpmDeps` で固定ハッシュで取り、ビルド中はネットワークに出ない。`pnpm-lock.yaml` を変えたら、`flake.nix` の `pnpmDeps.hash` を `lib.fakeHash` にして一度ビルドし、表示された値に差し替える
+- ビルドには nixpkgs の pnpm 10（`pnpm_10`）を使う。開発で使う pnpm 10 と同じ系列で、lockfile の形式（9.0）もそのまま
+- パッケージに入るのは CLI と `@ccpluck/core` だけ（Web ローカル版は入らない）。実行時に使う git は wrapper で PATH に足す。`gh` は GitHub のトークンを借りるときだけ使い、PATH にあれば使う
+
 ## 進捗
 
 | マイルストーン | 状態 |
