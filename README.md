@@ -25,7 +25,7 @@ pnpm build
 pnpm update-schema   # schemastore の JSON Schema から packages/core/src/schema-snapshot.ts を再生成
 ```
 
-Node 22 と pnpm 10 で確認しています。
+Node 24 と pnpm 10 で確認しています。
 
 ## 進捗
 
