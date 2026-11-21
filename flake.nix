@@ -1,7 +1,7 @@
 {
   description = "ccpluck: pick, apply and roll back individual Claude Code settings.json items";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
   outputs =
     { self, nixpkgs }:
@@ -9,7 +9,6 @@
       lib = nixpkgs.lib;
       systems = [
         "aarch64-darwin"
-        "x86_64-darwin"
         "x86_64-linux"
         "aarch64-linux"
       ];
@@ -19,7 +18,7 @@
         pkgs:
         let
           nodejs = pkgs.nodejs_22;
-          pnpm = pkgs.pnpm_11;
+          pnpm = pkgs.pnpm_10;
         in
         pkgs.stdenv.mkDerivation (finalAttrs: {
           pname = "ccpluck";
@@ -33,7 +32,7 @@
             inherit (finalAttrs) pname version src;
             inherit pnpm;
             fetcherVersion = 3;
-            hash = "sha256-2+SV6J6QJaGijulrMiMIpTMN/gsA/iRdfli2ZZaEvrc=";
+            hash = "sha256-CZ+zJ9aEt81noyL9ZWKv9bEc8EurAIIWvQmSvDHm89w=";
           };
 
           nativeBuildInputs = [
@@ -99,7 +98,7 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.nodejs_22
-            pkgs.pnpm_11
+            pkgs.pnpm_10
             pkgs.git
           ];
         };

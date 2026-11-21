@@ -36,9 +36,9 @@ nix develop                                     # Node 22・pnpm・git の入っ
 nix flake check
 ```
 
-- `flake.nix` は aarch64-darwin / x86_64-darwin / x86_64-linux / aarch64-linux に対応する。nixpkgs は `nixos-26.05`（x86_64-darwin を含む最後のリリース。unstable は x86_64-darwin を外したため）
+- `flake.nix` は aarch64-darwin / x86_64-linux / aarch64-linux に対応する（x86_64-darwin は対象外）。nixpkgs は `nixpkgs-unstable` の 1 つだけ
 - 依存は `pnpm-lock.yaml` から `fetchPnpmDeps` で固定ハッシュで取り、ビルド中はネットワークに出ない。`pnpm-lock.yaml` を変えたら、`flake.nix` の `pnpmDeps.hash` を `lib.fakeHash` にして一度ビルドし、表示された値に差し替える
-- ビルドには nixpkgs の pnpm 11 を使う（26.05 の pnpm 10 は既知の脆弱性の印があり評価できないため）。lockfile の形式（9.0）は pnpm 10 と同じ
+- ビルドには nixpkgs の pnpm 10（`pnpm_10`）を使う。開発で使う pnpm 10 と同じ系列で、lockfile の形式（9.0）もそのまま
 - パッケージに入るのは CLI と `@ccpluck/core` だけ（Web ローカル版は入らない）。実行時に使う git は wrapper で PATH に足す。`gh` は GitHub のトークンを借りるときだけ使い、PATH にあれば使う
 
 ## 進捗
