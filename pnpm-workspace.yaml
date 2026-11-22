@@ -1,3 +1,7 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# Supply chain: install only versions published at least 3 days ago (in minutes).
+# Renovate waits 7 days for ordinary updates and 3 for security fixes.
+minimumReleaseAge: 4320
