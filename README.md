@@ -1,5 +1,7 @@
 # ccpluck（仮称）
 
+[![dept](https://raw.githubusercontent.com/shiroinock/ccpluck/dept-badge/dept.svg)](https://github.com/shiroinock/ccpluck/blob/dept-badge/dept.md)
+
 Claude Code の `settings.json` を **項目単位で** 共有・取り込み・巻き戻しするためのツール群です。
 設計の背景は [HANDOFF.md](HANDOFF.md) を参照してください。
 
