@@ -39,7 +39,7 @@ nix flake check
 ```
 
 - `flake.nix` は aarch64-darwin / x86_64-linux / aarch64-linux に対応する（x86_64-darwin は対象外）。nixpkgs は `nixpkgs-unstable` の 1 つだけ
-- 依存は `pnpm-lock.yaml` から `fetchPnpmDeps` で固定ハッシュで取り、ビルド中はネットワークに出ない。`pnpm-lock.yaml` を変えたら、`flake.nix` の `pnpmDeps.hash` を `lib.fakeHash` にして一度ビルドし、表示された値に差し替える
+- 依存は `pnpm-lock.yaml` から `fetchPnpmDeps` で固定ハッシュで取り、ビルド中はネットワークに出ない。`pnpm-lock.yaml` を変えて `pnpmDeps.hash` がずれると、PR の検査 `hashes / hashes` が落ちる。`nix run github:shiroinock/workflows#nix-hashes -- --fix .#default.pnpmDeps` で直す(手で直すなら、`lib.fakeHash` にして一度ビルドし、表示された値に差し替える)
 - ビルドには nixpkgs の pnpm 10（`pnpm_10`）を使う。開発で使う pnpm 10 と同じ系列で、lockfile の形式（9.0）もそのまま
 - パッケージに入るのは CLI と `@ccpluck/core` だけ（Web ローカル版は入らない）。実行時に使う git は wrapper で PATH に足す。`gh` は GitHub のトークンを借りるときだけ使い、PATH にあれば使う
 
