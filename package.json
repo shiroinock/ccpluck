@@ -2,7 +2,7 @@
   "name": "ccpluck-monorepo",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.34.9",
+  "packageManager": "pnpm@12.22.0",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
